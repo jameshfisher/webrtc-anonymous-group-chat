@@ -7,8 +7,6 @@
       // adapter.js
       var RTCPeerConnection = null
       var getUserMedia = null
-      var attachMediaStream = null
-      var reattachMediaStream = null
       var webrtcDetectedBrowser = null
 
       if (navigator.mozGetUserMedia) {
@@ -29,18 +27,6 @@
         // Code from Adam Barth.
         getUserMedia = navigator.mozGetUserMedia.bind(navigator)
 
-        // Attach a media stream to an element.
-        attachMediaStream = function (element, stream) {
-          console.log('Attaching media stream')
-          element.mozSrcObject = stream
-          element.play()
-        }
-
-        reattachMediaStream = function (to, from) {
-          console.log('Reattaching media stream')
-          to.mozSrcObject = from.mozSrcObject
-          to.play()
-        }
 
         // Fake get{Video,Audio}Tracks
         MediaStream.prototype.getVideoTracks = function () {
@@ -61,15 +47,6 @@
         // Get UserMedia (only difference is the prefix).
         // Code from Adam Barth.
         getUserMedia = navigator.webkitGetUserMedia.bind(navigator)
-
-        // Attach a media stream to an element.
-        attachMediaStream = function (element, stream) {
-          element.src = webkitURL.createObjectURL(stream)
-        }
-
-        reattachMediaStream = function (to, from) {
-          to.src = from.src
-        }
 
         // The representation of tracks in a stream is changed in M26.
         // Unify them for earlier Chrome versions in the coexisting period.
@@ -104,27 +81,14 @@
     <link href="css/serverless-webrtc-bootstrap.css" rel="stylesheet">
 </head>
 <body>
-<a href="https://github.com/cjb/serverless-webrtc/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_green_007200.png" alt="Fork me on GitHub"></a>
-<div class="span4">
-  <Video id="localVideo">
-</div>
-<div class="span4">
-  <Video id="remoteVideo">
-</div>
-<div class="span4">
-  <fieldset class="well">
-    <p class="head muted">
-      Serverless WebRTC chat demonstration.
-    </p>
-    <div class="text-info" id="chatlog" style="height:350px; overflow:auto;">
-    </div>
-  </fieldset>
+
+  <div class="text-info" id="chatlog" style="height:350px; overflow:auto;">
+  </div>
+
   <form class="form-inline" onSubmit="return sendMessage()" action="">
     <input type="text" id="messageTextBox" placeholder="Type your message here">
     <button type="submit" id="sendMessageBtn" class="btn">Send message</button>
   </form>
-  <input type="file" id="fileBtn">
-</div>
 
 <div class="modal" id="showLocalOffer" data-backdrop="static" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
   <div class="modal-header">
@@ -249,15 +213,7 @@ $('#joinBtn').click(function () {
   navigator.getUserMedia = navigator.getUserMedia ||
                            navigator.webkitGetUserMedia ||
                            navigator.mozGetUserMedia ||
-                           navigator.msGetUserMedia
-  navigator.getUserMedia({video: true, audio: true}, function (stream) {
-    var video = document.getElementById('localVideo')
-    video.src = window.URL.createObjectURL(stream)
-    video.play()
-    pc2.addStream(stream)
-  }, function (error) {
-    console.log('Error adding stream to pc2: ' + error)
-  })
+                           navigator.msGetUserMedia;
   $('#getRemoteOffer').modal('show')
 })
 
@@ -365,24 +321,15 @@ function createLocalOffer () {
   navigator.getUserMedia = navigator.getUserMedia ||
                            navigator.webkitGetUserMedia ||
                            navigator.mozGetUserMedia ||
-                           navigator.msGetUserMedia
-  navigator.getUserMedia({video: true, audio: true}, function (stream) {
-    var video = document.getElementById('localVideo')
-    video.src = window.URL.createObjectURL(stream)
-    video.play()
-    pc1.addStream(stream)
-    console.log(stream)
-    console.log('adding stream to pc1')
-    setupDC1()
+                           navigator.msGetUserMedia;
+    setupDC1();
     pc1.createOffer(function (desc) {
-      pc1.setLocalDescription(desc, function () {}, function () {})
-      console.log('created local offer', desc)
-    },
-    function () { console.warn("Couldn't create offer") },
-    sdpConstraints)
-  }, function (error) {
-    console.log('Error adding stream to pc1: ' + error)
-  })
+        pc1.setLocalDescription(desc, function () {}, function () {})
+        console.log('created local offer', desc)
+      },
+      function () { console.warn("Couldn't create offer") },
+      sdpConstraints
+    );
 }
 
 pc1.onicecandidate = function (e) {
@@ -391,15 +338,6 @@ pc1.onicecandidate = function (e) {
     $('#localOffer').html(JSON.stringify(pc1.localDescription))
   }
 }
-
-function handleOnaddstream (e) {
-  console.log('Got remote stream', e.stream)
-  var el = document.getElementById('remoteVideo')
-  el.autoplay = true
-  attachMediaStream(el, e.stream)
-}
-
-pc1.onaddstream = handleOnaddstream
 
 function handleOnconnection () {
   console.log('Datachannel connected')
@@ -502,7 +440,6 @@ function handleCandidateFromPC1 (iceCandidate) {
   pc2.addIceCandidate(iceCandidate)
 }
 
-pc2.onaddstream = handleOnaddstream
 pc2.onconnection = handleOnconnection
 
 function getTimestamp () {
