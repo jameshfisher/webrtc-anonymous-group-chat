@@ -88,10 +88,7 @@
     <button type="submit" id="sendMessageBtn" class="btn">Send message</button>
   </form>
 
-<div class="modal" id="showLocalOffer" data-backdrop="static" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
-  <div class="modal-header">
-    <h3 id="myModalLabel">Send your local offer to someone else</h3>
-  </div>
+<div>
   <div class="modal-body">
     Here's your "offer" -- it tells someone else how to connect to you.  Send the whole thing to them, for example in an instant message or e-mail.
   <br/>
@@ -102,10 +99,7 @@
   </div>
 </div>
 
-<div class="modal" id="showLocalAnswer" data-backdrop="static" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
-  <div class="modal-header">
-    <h3 id="myModalLabel">Send your local answer to someone else</h3>
-  </div>
+<div>
   <div class="modal-body">
     Here's your "answer" -- it tells someone else how to connect to you.  Send the whole thing to them, for example in an instant message or e-mail.
   <br/>
@@ -116,10 +110,7 @@
   </div>
 </div>
 
-<div class="modal" id="getRemoteOffer" data-backdrop="static" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
-  <div class="modal-header">
-    <h3 id="myModalLabel">Paste the "offer" you received</h3>
-  </div>
+<div>
   <div class="modal-body">
     The person who created the room will send you an "offer" string -- paste it here.
   <br/>
@@ -130,7 +121,7 @@
   </div>
 </div>
 
-<div class="modal" id="getRemoteAnswer" data-backdrop="static" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
+<div>
   <div class="modal-header">
     <h3 id="myModalLabel">Paste the "answer" you received</h3>
   </div>
@@ -144,7 +135,7 @@
   </div>
 </div>
 
-<div class="modal" id="waitForConnection" data-backdrop="static" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" hidden>
+<div>
   <div class="modal-header">
     <h3 id="myModalLabel">Waiting for connection</h3>
   </div>
@@ -156,7 +147,7 @@
   </div>
 </div>
 
-<div class="modal" id="createOrJoin" data-backdrop="static" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+<div>
   <div class="modal-header">
     <h3 id="myModalLabel">Create or join a room?</h3>
   </div>
@@ -197,13 +188,7 @@ var sdpConstraints = {
   }
 }
 
-$('#showLocalOffer').modal('hide')
-$('#getRemoteAnswer').modal('hide')
-$('#waitForConnection').modal('hide')
-$('#createOrJoin').modal('show')
-
 function createBtnClick() {
-  $('#showLocalOffer').modal('show')
   createLocalOffer()
 }
 
@@ -212,11 +197,9 @@ function joinBtnClick() {
                            navigator.webkitGetUserMedia ||
                            navigator.mozGetUserMedia ||
                            navigator.msGetUserMedia;
-  $('#getRemoteOffer').modal('show')
 }
 
 function offerSentBtnClick() {
-  $('#getRemoteAnswer').modal('show')
 }
 
 function offerRecdBtnClick() {
@@ -225,18 +208,15 @@ function offerRecdBtnClick() {
   console.log('Received remote offer', offerDesc)
   writeToChatLog('Received remote offer', 'text-success')
   handleOfferFromPC1(offerDesc)
-  $('#showLocalAnswer').modal('show')
 }
 
 function answerSentBtnClick() {
-  $('#waitForConnection').modal('show')
 }
 
 function answerRecdBtnClick() {
   var answer = document.getElementById('remoteAnswer').value
   var answerDesc = new RTCSessionDescription(JSON.parse(answer))
   handleAnswerFromPC2(answerDesc)
-  $('#waitForConnection').modal('show')
 }
 
 function sendMessage () {
@@ -258,8 +238,6 @@ function setupDC1 () {
     console.log('Created datachannel (pc1)')
     dc1.onopen = function (e) {
       console.log('data channel connect')
-      $('#waitForConnection').modal('hide')
-      $('#waitForConnection').remove()
     }
     dc1.onmessage = function (e) {
       console.log('Got message (pc1)', e.data)
@@ -302,13 +280,6 @@ pc1.onicecandidate = function (e) {
 function handleOnconnection () {
   console.log('Datachannel connected')
   writeToChatLog('Datachannel connected', 'text-success')
-  $('#waitForConnection').modal('hide')
-  // If we didn't call remove() here, there would be a race on pc2:
-  //   - first onconnection() hides the dialog, then someone clicks
-  //     on answerSentBtn which shows it, and it stays shown forever.
-  $('#waitForConnection').remove()
-  $('#showLocalAnswer').modal('hide')
-  $('#messageTextBox').focus()
 }
 
 pc1.onconnection = handleOnconnection
@@ -353,8 +324,6 @@ pc2.ondatachannel = function (e) {
   activedc = dc2
   dc2.onopen = function (e) {
     console.log('data channel connect')
-    $('#waitForConnection').modal('hide')
-    $('#waitForConnection').remove()
   }
   dc2.onmessage = function (e) {
     console.log('Got message (pc2)', e.data)
