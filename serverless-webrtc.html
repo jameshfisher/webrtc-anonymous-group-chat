@@ -220,7 +220,7 @@ function offerSentBtnClick() {
 }
 
 function offerRecdBtnClick() {
-  var offer = $('#remoteOffer').val()
+  var offer = document.getElementById('remoteOffer').value
   var offerDesc = new RTCSessionDescription(JSON.parse(offer))
   console.log('Received remote offer', offerDesc)
   writeToChatLog('Received remote offer', 'text-success')
@@ -233,21 +233,19 @@ function answerSentBtnClick() {
 }
 
 function answerRecdBtnClick() {
-  var answer = $('#remoteAnswer').val()
+  var answer = document.getElementById('remoteAnswer').value
   var answerDesc = new RTCSessionDescription(JSON.parse(answer))
   handleAnswerFromPC2(answerDesc)
   $('#waitForConnection').modal('show')
 }
 
 function sendMessage () {
-  if ($('#messageTextBox').val()) {
+  if (document.getElementById('messageTextBox').value) {
     var channel = new RTCMultiSession()
-    writeToChatLog($('#messageTextBox').val(), 'text-success')
-    channel.send({message: $('#messageTextBox').val()})
-    $('#messageTextBox').val('')
+    writeToChatLog(document.getElementById('messageTextBox').value, 'text-success')
+    channel.send({message: document.getElementById('messageTextBox').value})
+    document.getElementById('messageTextBox').value = '';
 
-    // Scroll chat text area to the bottom on new input.
-    $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight)
   }
 
   return false
@@ -274,8 +272,6 @@ function setupDC1 () {
       console.log(e)
       var data = JSON.parse(e.data)
       writeToChatLog(data.message, 'text-info')
-      // Scroll chat text area to the bottom on new input.
-      $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight)
     }
   } catch (e) { console.warn('No data channel (pc1)', e); }
 }
@@ -364,8 +360,6 @@ pc2.ondatachannel = function (e) {
     console.log('Got message (pc2)', e.data)
     var data = JSON.parse(e.data)
     writeToChatLog(data.message, 'text-info')
-    // Scroll chat text area to the bottom on new input.
-    $('#chatlog').scrollTop($('#chatlog')[0].scrollHeight)
   }
 }
 
