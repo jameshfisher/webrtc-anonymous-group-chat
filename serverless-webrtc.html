@@ -47,44 +47,27 @@
 
 <script>
   // adapter.js
-  var RTCPeerConnection = null
-  var getUserMedia = null
-  var webrtcDetectedBrowser = null
+  var RTCPeerConnection = webkitRTCPeerConnection
 
-  if (navigator.webkitGetUserMedia) {
-    console.log('This appears to be Chrome')
-
-    webrtcDetectedBrowser = 'chrome'
-
-    // The RTCPeerConnection object.
-    RTCPeerConnection = webkitRTCPeerConnection
-
-    // Get UserMedia (only difference is the prefix).
-    // Code from Adam Barth.
-    getUserMedia = navigator.webkitGetUserMedia.bind(navigator)
-
-    // The representation of tracks in a stream is changed in M26.
-    // Unify them for earlier Chrome versions in the coexisting period.
-    if (!webkitMediaStream.prototype.getVideoTracks) {
-      webkitMediaStream.prototype.getVideoTracks = function () {
-        return this.videoTracks
-      }
-      webkitMediaStream.prototype.getAudioTracks = function () {
-        return this.audioTracks
-      }
+  // The representation of tracks in a stream is changed in M26.
+  // Unify them for earlier Chrome versions in the coexisting period.
+  if (!webkitMediaStream.prototype.getVideoTracks) {
+    webkitMediaStream.prototype.getVideoTracks = function () {
+      return this.videoTracks
     }
-
-    // New syntax of getXXXStreams method in M26.
-    if (!webkitRTCPeerConnection.prototype.getLocalStreams) {
-      webkitRTCPeerConnection.prototype.getLocalStreams = function () {
-        return this.localStreams
-      }
-      webkitRTCPeerConnection.prototype.getRemoteStreams = function () {
-        return this.remoteStreams
-      }
+    webkitMediaStream.prototype.getAudioTracks = function () {
+      return this.audioTracks
     }
-  } else {
-    console.log('Browser does not appear to be WebRTC-capable')
+  }
+
+  // New syntax of getXXXStreams method in M26.
+  if (!webkitRTCPeerConnection.prototype.getLocalStreams) {
+    webkitRTCPeerConnection.prototype.getLocalStreams = function () {
+      return this.localStreams
+    }
+    webkitRTCPeerConnection.prototype.getRemoteStreams = function () {
+      return this.remoteStreams
+    }
   }
 
 </script>
@@ -96,11 +79,6 @@
 
     https://webrtc-demos.appspot.com/html/pc1.html
 */
-
-navigator.getUserMedia = navigator.getUserMedia ||
-                         navigator.webkitGetUserMedia ||
-                         navigator.mozGetUserMedia ||
-                         navigator.msGetUserMedia;
 
 var cfg = {'iceServers': [{'url': 'stun:23.21.150.121'}]},
   con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] }
