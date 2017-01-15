@@ -9,8 +9,6 @@
       Open the JS console! To create a room, use <code>create()</code>.
     </p>
     <script>
-      var sdpConstraints = { optional: [], mandatory: {} };
-
       function newPeerConn() {
         var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
         var conn = new RTCPeerConnection(
@@ -40,7 +38,7 @@
             peerConn.setLocalDescription(desc, function () {}, function () {});
           },
           function () { console.warn("Couldn't create offer") },
-          sdpConstraints
+          {}
         );
         peerConn.onicecandidate = function(e) {
           if (e.candidate == null) {
@@ -83,7 +81,7 @@
             peerConn.setLocalDescription(answerDesc);
           },
           function () { console.warn("Couldn't create offer") },
-          sdpConstraints
+          {}
         );
       }
     </script>
