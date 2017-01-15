@@ -8,10 +8,7 @@
     <h1>Open the JS console!</h1>
     <script>
       var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
-      var peerConn = new RTCPeerConnection(
-        {'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]},
-        {'optional': [{'DtlsSrtpKeyAgreement': true}]}
-      );
+      var peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
       console.log('Call create(), or join("some offer")');
       function create() {
         console.log("Creating ...");
