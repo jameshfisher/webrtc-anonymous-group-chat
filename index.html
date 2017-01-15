@@ -9,27 +9,10 @@
     Open the JS console! To create a room, use <code>create()</code>.
   </p>
 
-  <div class="text-info" id="chatlog">
-  </div>
-
-  <form class="form-inline" onSubmit="return sendMessage()" action="">
-    <input type="text" id="messageTextBox" placeholder="Type your message here">
-    <button type="submit" id="sendMessageBtn">Send message</button>
-  </form>
-
 <script>
-  var RTCPeerConnection = webkitRTCPeerConnection
-
-  //serverless-webrtc.js
-/* See also:
-    http://www.html5rocks.com/en/tutorials/webrtc/basics/
-    https://code.google.com/p/webrtc-samples/source/browse/trunk/apprtc/index.html
-
-    https://webrtc-demos.appspot.com/html/pc1.html
-*/
-
-var cfg = {'iceServers': [{'url': 'stun:23.21.150.121'}]},
-  con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] }
+  var RTCPeerConnection = webkitRTCPeerConnection;
+  var cfg = {'iceServers': [{'url': 'stun:23.21.150.121'}]};
+  var con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] };
 
 /* THIS IS ALICE, THE CALLER/SENDER */
 
@@ -54,7 +37,6 @@ var sdpConstraints = {
 function join(offer) {
   var offerDesc = new RTCSessionDescription(offer)
   console.log('Received remote offer', offerDesc)
-  writeToChatLog('Received remote offer', 'text-success')
   handleOfferFromPC1(offerDesc)
 }
 
@@ -63,15 +45,9 @@ function gotAnswer(answer) {
   handleAnswerFromPC2(answerDesc)
 }
 
-function sendMessage () {
-  if (document.getElementById('messageTextBox').value) {
-    var channel = new RTCMultiSession()
-    writeToChatLog(document.getElementById('messageTextBox').value, 'text-success')
-    channel.send({message: document.getElementById('messageTextBox').value})
-    document.getElementById('messageTextBox').value = '';
-  }
-
-  return false
+function say(msg) {
+  var channel = new RTCMultiSession();
+  channel.send({message: msg});
 }
 
 function setupDC1 () {
@@ -84,15 +60,6 @@ function setupDC1 () {
     }
     dc1.onmessage = function (e) {
       console.log('Got message (pc1)', e.data)
-      if (e.data.charCodeAt(0) == 2) {
-        // The first message we get from Firefox (but not Chrome)
-        // is literal ASCII 2 and I don't understand why -- if we
-        // leave it in, JSON.parse() will barf.
-        return
-      }
-      console.log(e)
-      var data = JSON.parse(e.data)
-      writeToChatLog(data.message, 'text-info')
     }
   } catch (e) { console.warn('No data channel (pc1)', e); }
 }
@@ -118,7 +85,6 @@ pc1.onicecandidate = function (e) {
 
 function handleOnconnection () {
   console.log('Datachannel connected')
-  writeToChatLog('Datachannel connected', 'text-success')
 }
 
 pc1.onconnection = handleOnconnection
@@ -141,7 +107,6 @@ pc1.onicegatheringstatechange = onicegatheringstatechange
 
 function handleAnswerFromPC2 (answerDesc) {
   console.log('Received remote answer: ', answerDesc)
-  writeToChatLog('Received remote answer', 'text-success')
   pc1.setRemoteDescription(answerDesc)
 }
 
@@ -166,15 +131,12 @@ pc2.ondatachannel = function (e) {
   }
   dc2.onmessage = function (e) {
     console.log('Got message (pc2)', e.data)
-    var data = JSON.parse(e.data)
-    writeToChatLog(data.message, 'text-info')
   }
 }
 
 function handleOfferFromPC1 (offerDesc) {
   pc2.setRemoteDescription(offerDesc)
   pc2.createAnswer(function (answerDesc) {
-    writeToChatLog('Created local answer', 'text-success')
     console.log('Created local answer: ', answerDesc)
     pc2.setLocalDescription(answerDesc)
   },
@@ -199,22 +161,6 @@ function handleCandidateFromPC1 (iceCandidate) {
 
 pc2.onconnection = handleOnconnection
 
-function getTimestamp () {
-  var totalSec = new Date().getTime() / 1000
-  var hours = parseInt(totalSec / 3600) % 24
-  var minutes = parseInt(totalSec / 60) % 60
-  var seconds = parseInt(totalSec % 60)
-
-  var result = (hours < 10 ? '0' + hours : hours) + ':' +
-    (minutes < 10 ? '0' + minutes : minutes) + ':' +
-    (seconds < 10 ? '0' + seconds : seconds)
-
-  return result
-}
-
-function writeToChatLog (message, message_type) {
-  document.getElementById('chatlog').innerHTML += '<p class="' + message_type + '">' + '[' + getTimestamp() + '] ' + message + '</p>'
-}
 </script>
 <script>
   // js/file-transfer.js
