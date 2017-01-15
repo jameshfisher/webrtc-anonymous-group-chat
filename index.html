@@ -9,13 +9,7 @@
       Open the JS console! To create a room, use <code>create()</code>.
     </p>
     <script>
-      var sdpConstraints = {
-        optional: [],
-        mandatory: {
-          OfferToReceiveAudio: true,
-          OfferToReceiveVideo: true
-        }
-      };
+      var sdpConstraints = { optional: [], mandatory: {} };
 
       function newPeerConn() {
         var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
@@ -29,45 +23,41 @@
         return conn;
       }
 
-      var dataChannel;
-
       function create() {
-        var pc1 = newPeerConn();
-        dataChannel = pc1.createDataChannel('test', {reliable: true});
-
+        var peerConn = newPeerConn();
+        var dataChannel = peerConn.createDataChannel('test', {reliable: true});
         window.say = function(msg) {
           dataChannel.send(msg);
         };
-
         dataChannel.onopen = function (e) {
           console.log('Say things with say("hello")');
         };
         dataChannel.onmessage = function (e) {
-          console.log('Got message (pc1)', e.data);
+          console.log('Got message:', e.data);
         };
-        pc1.createOffer(
+        peerConn.createOffer(
           function (desc) {
-            pc1.setLocalDescription(desc, function () {}, function () {});
+            peerConn.setLocalDescription(desc, function () {}, function () {});
           },
           function () { console.warn("Couldn't create offer") },
           sdpConstraints
         );
-        pc1.onicecandidate = function(e) {
+        peerConn.onicecandidate = function(e) {
           if (e.candidate == null) {
-            console.log("Get joiners to call: ", "join(", JSON.stringify(pc1.localDescription), ")");
+            console.log("Get joiners to call: ", "join(", JSON.stringify(peerConn.localDescription), ")");
           }
         };
         window.gotAnswer = function(answer) {
           var answerDesc = new RTCSessionDescription(answer);
-          pc1.setRemoteDescription(answerDesc);
+          peerConn.setRemoteDescription(answerDesc);
         };
       }
 
       function join(offer) {
-        var pc2 = newPeerConn();
+        var peerConn = newPeerConn();
 
-        pc2.ondatachannel = function(e) {
-          dataChannel = e.channel || e; // Chrome sends event, FF sends raw channel
+        peerConn.ondatachannel = function(e) {
+          var dataChannel = e.channel || e; // Chrome sends event, FF sends raw channel
 
           window.say = function(msg) {
             dataChannel.send(msg);
@@ -76,21 +66,21 @@
             console.log('data channel connect');
           }
           dataChannel.onmessage = function (e) {
-            console.log('Got message (pc2)', e.data);
+            console.log('Got message:', e.data);
           }
         };
 
-        pc2.onicecandidate = function (e) {
+        peerConn.onicecandidate = function (e) {
           if (e.candidate == null) {
-            console.log("Get the creator to call: gotAnswer(", JSON.stringify(pc2.localDescription), ")");
+            console.log("Get the creator to call: gotAnswer(", JSON.stringify(peerConn.localDescription), ")");
           }
         };
 
         var offerDesc = new RTCSessionDescription(offer);
-        pc2.setRemoteDescription(offerDesc);
-        pc2.createAnswer(
+        peerConn.setRemoteDescription(offerDesc);
+        peerConn.createAnswer(
           function (answerDesc) {
-            pc2.setLocalDescription(answerDesc);
+            peerConn.setLocalDescription(answerDesc);
           },
           function () { console.warn("Couldn't create offer") },
           sdpConstraints
