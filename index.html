@@ -5,6 +5,10 @@
     <title>WebRTC chat</title>
 </head>
 <body>
+  <p>
+    Open the JS console! To create a room, use <code>create()</code>.
+  </p>
+
   <div class="text-info" id="chatlog">
   </div>
 
@@ -12,37 +16,6 @@
     <input type="text" id="messageTextBox" placeholder="Type your message here">
     <button type="submit" id="sendMessageBtn">Send message</button>
   </form>
-
-<div>
-  Here's your "offer" -- it tells someone else how to connect to you.  Send the whole thing to them, for example in an instant message or e-mail.
-  <textarea id="localOffer" name="localOffer" rows="10" cols="100"></textarea>
-  <button id="offerSentBtn" onclick="offerSentBtnClick()">Okay, I sent it.</button>
-</div>
-
-<div>
-  Here's your "answer" -- it tells someone else how to connect to you.  Send the whole thing to them, for example in an instant message or e-mail.
-  <textarea id="localAnswer" name="localAnswer" rows="10" cols="100"></textarea>
-  <button id="answerSentBtn" onclick="answerSentBtnClick()">Okay, I sent it.</button>
-</div>
-
-<div>
-  The person who created the room will send you an "offer" string -- paste it here.
-  <textarea id="remoteOffer" name="remoteOffer" rows="10" cols="100"></textarea>
-  <button id="offerRecdBtn" onclick="offerRecdBtnClick()">Okay, I pasted it.</button>
-</div>
-
-<div>
-  Now paste in the "answer" that was sent back to you.
-  <textarea id="remoteAnswer" name="remoteAnswer" rows="10" cols="100"></textarea>
-  <button id="answerRecdBtn" onclick="answerRecdBtnClick()">Okay, I pasted it.</button>
-</div>
-
-<div>
-  <h3>Create or join a room?</h3>
-  <div class="modal-footer">
-    <button id="createBtn" onclick="createLocalOffer()">Create</button>
-  </div>
-</div>
 
 <script>
   var RTCPeerConnection = webkitRTCPeerConnection
@@ -78,17 +51,15 @@ var sdpConstraints = {
   }
 }
 
-function offerRecdBtnClick() {
-  var offer = document.getElementById('remoteOffer').value
-  var offerDesc = new RTCSessionDescription(JSON.parse(offer))
+function join(offer) {
+  var offerDesc = new RTCSessionDescription(offer)
   console.log('Received remote offer', offerDesc)
   writeToChatLog('Received remote offer', 'text-success')
   handleOfferFromPC1(offerDesc)
 }
 
-function answerRecdBtnClick() {
-  var answer = document.getElementById('remoteAnswer').value
-  var answerDesc = new RTCSessionDescription(JSON.parse(answer))
+function gotAnswer(answer) {
+  var answerDesc = new RTCSessionDescription(answer)
   handleAnswerFromPC2(answerDesc)
 }
 
@@ -126,7 +97,7 @@ function setupDC1 () {
   } catch (e) { console.warn('No data channel (pc1)', e); }
 }
 
-function createLocalOffer () {
+function create() {
   setupDC1();
   pc1.createOffer(
     function (desc) {
@@ -139,9 +110,9 @@ function createLocalOffer () {
 }
 
 pc1.onicecandidate = function (e) {
-  console.log('ICE candidate (pc1)', e)
+  // console.log('ICE candidate (pc1)', e)
   if (e.candidate == null) {
-    document.getElementById('localOffer').innerText = JSON.stringify(pc1.localDescription);
+    console.log("Get joiners to call: ", "join(", JSON.stringify(pc1.localDescription), ")");
   }
 }
 
@@ -214,7 +185,7 @@ function handleOfferFromPC1 (offerDesc) {
 pc2.onicecandidate = function (e) {
   console.log('ICE candidate (pc2)', e)
   if (e.candidate == null) {
-    document.getElementById('localAnswer').innerText = JSON.stringify(pc2.localDescription);
+    console.log("Get the creator to call: gotAnswer(", JSON.stringify(pc2.localDescription), ")");
   }
 }
 
