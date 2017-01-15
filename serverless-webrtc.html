@@ -46,32 +46,8 @@
 </div>
 
 <script>
-  // adapter.js
   var RTCPeerConnection = webkitRTCPeerConnection
 
-  // The representation of tracks in a stream is changed in M26.
-  // Unify them for earlier Chrome versions in the coexisting period.
-  if (!webkitMediaStream.prototype.getVideoTracks) {
-    webkitMediaStream.prototype.getVideoTracks = function () {
-      return this.videoTracks
-    }
-    webkitMediaStream.prototype.getAudioTracks = function () {
-      return this.audioTracks
-    }
-  }
-
-  // New syntax of getXXXStreams method in M26.
-  if (!webkitRTCPeerConnection.prototype.getLocalStreams) {
-    webkitRTCPeerConnection.prototype.getLocalStreams = function () {
-      return this.localStreams
-    }
-    webkitRTCPeerConnection.prototype.getRemoteStreams = function () {
-      return this.remoteStreams
-    }
-  }
-
-</script>
-<script>
   //serverless-webrtc.js
 /* See also:
     http://www.html5rocks.com/en/tutorials/webrtc/basics/
