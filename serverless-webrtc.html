@@ -51,34 +51,7 @@
   var getUserMedia = null
   var webrtcDetectedBrowser = null
 
-  if (navigator.mozGetUserMedia) {
-    console.log('This appears to be Firefox')
-
-    webrtcDetectedBrowser = 'firefox'
-
-    // The RTCPeerConnection object.
-    RTCPeerConnection = mozRTCPeerConnection
-
-    // The RTCSessionDescription object.
-    RTCSessionDescription = mozRTCSessionDescription
-
-    // The RTCIceCandidate object.
-    RTCIceCandidate = mozRTCIceCandidate
-
-    // Get UserMedia (only difference is the prefix).
-    // Code from Adam Barth.
-    getUserMedia = navigator.mozGetUserMedia.bind(navigator)
-
-
-    // Fake get{Video,Audio}Tracks
-    MediaStream.prototype.getVideoTracks = function () {
-      return []
-    }
-
-    MediaStream.prototype.getAudioTracks = function () {
-      return []
-    }
-  } else if (navigator.webkitGetUserMedia) {
+  if (navigator.webkitGetUserMedia) {
     console.log('This appears to be Chrome')
 
     webrtcDetectedBrowser = 'chrome'
@@ -124,6 +97,11 @@
     https://webrtc-demos.appspot.com/html/pc1.html
 */
 
+navigator.getUserMedia = navigator.getUserMedia ||
+                         navigator.webkitGetUserMedia ||
+                         navigator.mozGetUserMedia ||
+                         navigator.msGetUserMedia;
+
 var cfg = {'iceServers': [{'url': 'stun:23.21.150.121'}]},
   con = { 'optional': [{'DtlsSrtpKeyAgreement': true}] }
 
@@ -151,10 +129,6 @@ function createBtnClick() {
 }
 
 function joinBtnClick() {
-  navigator.getUserMedia = navigator.getUserMedia ||
-                           navigator.webkitGetUserMedia ||
-                           navigator.mozGetUserMedia ||
-                           navigator.msGetUserMedia;
 }
 
 function offerSentBtnClick() {
@@ -183,7 +157,6 @@ function sendMessage () {
     writeToChatLog(document.getElementById('messageTextBox').value, 'text-success')
     channel.send({message: document.getElementById('messageTextBox').value})
     document.getElementById('messageTextBox').value = '';
-
   }
 
   return false
@@ -214,10 +187,6 @@ function setupDC1 () {
 
 function createLocalOffer () {
   console.log('video1')
-  navigator.getUserMedia = navigator.getUserMedia ||
-                           navigator.webkitGetUserMedia ||
-                           navigator.mozGetUserMedia ||
-                           navigator.msGetUserMedia;
     setupDC1();
     pc1.createOffer(function (desc) {
         pc1.setLocalDescription(desc, function () {}, function () {})
@@ -342,16 +311,10 @@ function writeToChatLog (message, message_type) {
  */
 /* For documentation and examples: http://bit.ly/RTCDataConnection */
 
-window.moz = !! navigator.mozGetUserMedia
-
 var RTCMultiSession = function (options) {
   return {
     send: function (message) {
-      if (moz && message.file)
-        data = message.file
-      else
-        data = JSON.stringify(message)
-
+      data = JSON.stringify(message)
       activedc.send(data)
     }
   }
