@@ -12,7 +12,7 @@
       console.log('Call create(), or join("some offer")');
       function create() {
         console.log("Creating ...");
-        var dataChannel = peerConn.createDataChannel('test', {reliable: true});
+        var dataChannel = peerConn.createDataChannel('test');
         dataChannel.onopen = (e) => {
           window.say = (msg) => { dataChannel.send(msg); };
           console.log('Say things with say("hi")');
