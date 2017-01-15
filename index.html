@@ -9,7 +9,7 @@
     <script>
       var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
       var peerConn = new RTCPeerConnection(
-        {'iceServers': [{'urls': ['stun:23.21.150.121']}]},
+        {'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]},
         {'optional': [{'DtlsSrtpKeyAgreement': true}]}
       );
       console.log('Call create(), or join("some offer")');
