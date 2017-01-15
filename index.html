@@ -15,39 +15,26 @@
           {'iceServers': [{'urls': ['stun:23.21.150.121']}]},
           {'optional': [{'DtlsSrtpKeyAgreement': true}]}
         );
-        conn.onconnection = function () {
-          console.log('Datachannel connected');
-        };
+        conn.onconnection = function () { console.log('Datachannel connected'); };
         return conn;
       }
 
       function create() {
         var peerConn = newPeerConn();
         var dataChannel = peerConn.createDataChannel('test', {reliable: true});
-        window.say = function(msg) {
-          dataChannel.send(msg);
-        };
-        dataChannel.onopen = function (e) {
-          console.log('Say things with say("hello")');
-        };
-        dataChannel.onmessage = function (e) {
-          console.log('Got message:', e.data);
-        };
-        peerConn.createOffer(
-          function (desc) {
-            peerConn.setLocalDescription(desc, function () {}, function () {});
-          },
-          function () { console.warn("Couldn't create offer") },
-          {}
-        );
+        window.say = function(msg) { dataChannel.send(msg); };
+        dataChannel.onopen = function (e) { console.log('Say things with say("hello")'); };
+        dataChannel.onmessage = function (e) { console.log('Got message:', e.data); };
+        peerConn.createOffer({})
+          .then((desc) => peerConn.setLocalDescription(desc, function () {}, function () {}))
+          .catch((err) => console.warn("Couldn't create offer"));
         peerConn.onicecandidate = function(e) {
           if (e.candidate == null) {
             console.log("Get joiners to call: ", "join(", JSON.stringify(peerConn.localDescription), ")");
           }
         };
         window.gotAnswer = function(answer) {
-          var answerDesc = new RTCSessionDescription(answer);
-          peerConn.setRemoteDescription(answerDesc);
+          peerConn.setRemoteDescription(new RTCSessionDescription(answer));
         };
       }
 
@@ -57,15 +44,9 @@
         peerConn.ondatachannel = function(e) {
           var dataChannel = e.channel || e; // Chrome sends event, FF sends raw channel
 
-          window.say = function(msg) {
-            dataChannel.send(msg);
-          };
-          dataChannel.onopen = function (e) {
-            console.log('data channel connect');
-          }
-          dataChannel.onmessage = function (e) {
-            console.log('Got message:', e.data);
-          }
+          window.say = function(msg) { dataChannel.send(msg); };
+          dataChannel.onopen = function (e) { console.log('data channel connect'); }
+          dataChannel.onmessage = function (e) { console.log('Got message:', e.data); }
         };
 
         peerConn.onicecandidate = function (e) {
@@ -76,13 +57,9 @@
 
         var offerDesc = new RTCSessionDescription(offer);
         peerConn.setRemoteDescription(offerDesc);
-        peerConn.createAnswer(
-          function (answerDesc) {
-            peerConn.setLocalDescription(answerDesc);
-          },
-          function () { console.warn("Couldn't create offer") },
-          {}
-        );
+        peerConn.createAnswer({})
+          .then((answerDesc) => peerConn.setLocalDescription(answerDesc))
+          .catch((err) => console.warn("Couldn't create answer"));
       }
     </script>
   </body>
