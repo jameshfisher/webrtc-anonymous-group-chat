@@ -1,5 +1,8 @@
 {
   "files": [
     "main.ts"
-  ]
+  ],
+  "compilerOptions": {
+    "strict": true
+  }
 }

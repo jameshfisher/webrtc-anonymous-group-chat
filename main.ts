@@ -2,8 +2,8 @@ const peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.go
 console.log('Call create(), or join("some offer")');
 
 interface Window {
-  say(string): void;
-  gotAnswer(RTCSessionDescription): void;
+  say(s: string): void;
+  gotAnswer(a: RTCSessionDescriptionInit): void;
 }
 
 function create() {
@@ -29,7 +29,7 @@ function create() {
   };
 }
 
-function join(offer) {
+function join(offer: RTCSessionDescriptionInit) {
   console.log("Joining ...");
 
   peerConn.ondatachannel = (e) => {
