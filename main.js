@@ -1,4 +1,3 @@
-var RTCPeerConnection = window.RTCPeerConnection || webkitRTCPeerConnection || mozRTCPeerConnection;
 var peerConn = new RTCPeerConnection({ 'iceServers': [{ 'urls': ['stun:stun.l.google.com:19302'] }] });
 console.log('Call create(), or join("some offer")');
 function create() {
