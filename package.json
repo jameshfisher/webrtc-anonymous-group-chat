@@ -1,0 +1,24 @@
+{
+  "name": "serverless-webrtc",
+  "version": "1.0.0",
+  "description": "Smallest WebRTC with no signaling server",
+  "main": "main.js",
+  "scripts": {
+    "build": "tsc --outFile main.js main.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jameshfisher/serverless-webrtc.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jameshfisher/serverless-webrtc/issues"
+  },
+  "homepage": "https://github.com/jameshfisher/serverless-webrtc#readme",
+  "devDependencies": {
+    "typescript": "^4.0.3"
+  }
+}
