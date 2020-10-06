@@ -1,5 +1,11 @@
 var peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
 console.log('Call create(), or join("some offer")');
+
+interface Window {
+  say(string): void;
+  gotAnswer(RTCSessionDescription): void;
+}
+
 function create() {
   console.log("Creating ...");
   var dataChannel = peerConn.createDataChannel('test');
