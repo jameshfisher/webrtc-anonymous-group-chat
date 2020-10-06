@@ -1,4 +1,4 @@
-var peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
+const peerConn = new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
 console.log('Call create(), or join("some offer")');
 
 interface Window {
@@ -8,7 +8,7 @@ interface Window {
 
 function create() {
   console.log("Creating ...");
-  var dataChannel = peerConn.createDataChannel('test');
+  const dataChannel = peerConn.createDataChannel('test');
   dataChannel.onopen = (e) => {
     window.say = (msg) => { dataChannel.send(msg); };
     console.log('Say things with say("hi")');
@@ -33,7 +33,7 @@ function join(offer) {
   console.log("Joining ...");
 
   peerConn.ondatachannel = (e) => {
-    var dataChannel = e.channel;
+    const dataChannel = e.channel;
     dataChannel.onopen = (e) => {
       window.say = (msg) => { dataChannel.send(msg); };
       console.log('Say things with say("hi")');
@@ -47,7 +47,7 @@ function join(offer) {
     }
   };
 
-  var offerDesc = new RTCSessionDescription(offer);
+  const offerDesc = new RTCSessionDescription(offer);
   peerConn.setRemoteDescription(offerDesc);
   peerConn.createAnswer({})
     .then((answerDesc) => peerConn.setLocalDescription(answerDesc))
