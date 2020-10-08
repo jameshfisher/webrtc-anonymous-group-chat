@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "ably/promises": "./ably/promises.js"
+  }
+}
