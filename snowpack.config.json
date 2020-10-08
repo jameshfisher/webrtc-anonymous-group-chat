@@ -1,0 +1,10 @@
+{
+  "mount": {
+    "public": "/",
+    "ts": "/js"
+  },
+  "plugins": ["@snowpack/plugin-typescript"],
+  "installOptions": {
+    "installTypes": true
+  }
+}

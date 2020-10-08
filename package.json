@@ -4,7 +4,7 @@
   "description": "Smallest WebRTC with no signaling server",
   "main": "main.js",
   "scripts": {
-    "build": "tsc",
+    "build": "snowpack build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -19,6 +19,11 @@
   },
   "homepage": "https://github.com/jameshfisher/serverless-webrtc#readme",
   "devDependencies": {
+    "@snowpack/plugin-typescript": "^1.0.1",
+    "snowpack": "^2.13.3",
     "typescript": "^4.0.3"
+  },
+  "dependencies": {
+    "ably": "^1.2.3"
   }
 }

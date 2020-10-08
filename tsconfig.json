@@ -1,8 +1,8 @@
 {
-  "files": [
-    "main.ts"
-  ],
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    "noEmit": true,
+    "target": "ESNext",
+    "moduleResolution": "node"
   }
 }
