@@ -6,14 +6,14 @@ declare global {
   }
 }
 
-type ClientId = string;
+type SessionId = string;
 
-// 1) "Hi everyone, I'm client X. Please send me your offer. 
-//    (Also I pinky swear that I've never said hello with id X before. 
+// 1) "Hi everyone, I'm session X. Please send me your offer. 
+//    (Also I pinky swear that I've never said hello with session id X before. 
 //    But you should check anyway, and tear down any previous connections!)"
 interface SignalingMsgHello {
   kind: "hello",
-  fromClientId: ClientId
+  fromSessionId: SessionId
 }
 
 // FIXME should we combine SignalingMsgOffer and SignalingMsgAnswer?
@@ -22,16 +22,16 @@ interface SignalingMsgHello {
 // 2) "Hi X, I'm Y. Here is my offer."
 interface SignalingMsgOffer {
   kind: "offer",
-  fromClientId: ClientId,
-  toClientId: ClientId,
+  fromSessionId: SessionId,
+  toSessionId: SessionId,
   offer: RTCSessionDescriptionInit
 }
 
 // 3) "Hi Y. Thanks for the offer; I graciously accept."
 interface SignalingMsgAnswer {
   kind: "answer",
-  fromClientId: ClientId,
-  toClientId: ClientId,
+  fromSessionId: SessionId,
+  toSessionId: SessionId,
   answer: RTCSessionDescriptionInit
 }
 
@@ -44,17 +44,17 @@ function assertUnreachable(x: never): never {
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer") as HTMLInputElement;
 
-// A client is one run of the webpage. A refresh gets a new client ID.
+// A session is one run of the webpage. A refresh gets a new session ID.
 // This simplifies things:
-// clients can assume no previous connection with the client,
-// and can assume a client will never come back after disappearing.
-// (On top of this, we can build a mapping ClientId -> UserId.
-// This will also allow for multiple simultaneous clients per user.)
-const myClientId =  Math.random().toString();  // FIXME uuid
-console.log("I am:", myClientId);
+// sessions can assume no previous connection with the client,
+// and can assume a session will never come back after disappearing.
+// (On top of this, we can build a mapping SessionId -> UserId.
+// This will also allow for multiple simultaneous sessions per user.)
+const mySessionId =  Math.random().toString();  // FIXME uuid
+console.log("I am:", mySessionId);
 
-const peerConns: Map<ClientId, RTCPeerConnection> = new Map();
-const dataChannels: Map<ClientId, RTCDataChannel> = new Map();
+const peerConns: Map<SessionId, RTCPeerConnection> = new Map();
+const dataChannels: Map<SessionId, RTCDataChannel> = new Map();
 
 // @ts-ignore
 window.dataChannels = dataChannels;
@@ -92,7 +92,7 @@ ablyClient.connection.on('connected', () => {
   console.log("Connected to Ably");
   // Note that we will also receive this after publishing it
   // Note: not sure if we need to wait until connected before publishing.
-  publishSignalingMsg({ kind: "hello", fromClientId: myClientId });
+  publishSignalingMsg({ kind: "hello", fromSessionId: mySessionId });
 });
 
 ablyClient.connection.on('failed', () => {
@@ -103,7 +103,7 @@ function newPeerConnection(): RTCPeerConnection {
   return new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
 }
 
-function getOrCreatePeerConnection(uid: ClientId): RTCPeerConnection {
+function getOrCreatePeerConnection(uid: SessionId): RTCPeerConnection {
   let peerConn = peerConns.get(uid);
   if (peerConn === undefined) {
     peerConn = newPeerConnection();
@@ -112,57 +112,58 @@ function getOrCreatePeerConnection(uid: ClientId): RTCPeerConnection {
   return peerConn;
 }
 
-function handleSignalingMsgHello(signalingMsgHello: SignalingMsgHello) {
-  if (signalingMsgHello.fromClientId === myClientId) return;
+async function handleSignalingMsgHello(signalingMsgHello: SignalingMsgHello) {
+  if (signalingMsgHello.fromSessionId === mySessionId) return;
 
-  const newClientId = signalingMsgHello.fromClientId;
-  console.log("Received hello from", newClientId);
+  const newSessionId = signalingMsgHello.fromSessionId;
+  console.log("Received hello from", newSessionId);
 
   const peerConn = newPeerConnection();
-  peerConns.set(newClientId, peerConn);
+  peerConns.set(newSessionId, peerConn);
 
   const dataChannel = peerConn.createDataChannel('myDataChannel');
-  dataChannels.set(newClientId, dataChannel);
+  dataChannels.set(newSessionId, dataChannel);
 
   dataChannel.onmessage = ev => show(ev.data);
-  peerConn.createOffer({})
-    .then(desc => peerConn.setLocalDescription(desc))
-    .then(() => {})
-    .catch(err => console.error(err));
+
   peerConn.onicecandidate = ev => {
-    if (ev.candidate == null) {
+    if (ev.candidate !== null) {
+      ev.candidate
       publishSignalingMsg({ 
         kind: "offer", 
-        fromClientId: myClientId, 
-        toClientId: newClientId, 
+        fromSessionId: mySessionId, 
+        toSessionId: newSessionId, 
         offer: peerConn.localDescription?.toJSON()  // FIXME is this really an RTCSessionDescriptionInit
       });
     }
   };
+
+  const desc = await peerConn.createOffer({});
+  await peerConn.setLocalDescription(desc);
 }
 
-function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
-  if (signalingMsgOffer.toClientId !== myClientId) return;
-  if (signalingMsgOffer.fromClientId === myClientId) return;
+async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
+  if (signalingMsgOffer.toSessionId !== mySessionId) return;
+  if (signalingMsgOffer.fromSessionId === mySessionId) return;
 
-  const fromClientId = signalingMsgOffer.fromClientId;
-  console.log("Received offer from", fromClientId);
+  const fromSessionId = signalingMsgOffer.fromSessionId;
+  console.log("Received offer from", fromSessionId);
 
-  const remotePeerConn = getOrCreatePeerConnection(fromClientId);
+  const peerConn = getOrCreatePeerConnection(fromSessionId);
 
-  remotePeerConn.ondatachannel = dataChannelEv => {
+  peerConn.ondatachannel = dataChannelEv => {
     const dataChannel = dataChannelEv.channel;
-    dataChannels.set(fromClientId, dataChannel);
+    dataChannels.set(fromSessionId, dataChannel);
     dataChannel.onmessage = msgEv => show(msgEv.data);
   };
 
-  remotePeerConn.onicecandidate = ev => {
+  peerConn.onicecandidate = ev => {
     if (ev.candidate == null) {
       publishSignalingMsg({
         kind: "answer", 
-        fromClientId: myClientId, 
-        toClientId: signalingMsgOffer.fromClientId, 
-        answer: remotePeerConn.localDescription?.toJSON()  // FIXME
+        fromSessionId: mySessionId, 
+        toSessionId: signalingMsgOffer.fromSessionId, 
+        answer: peerConn.localDescription?.toJSON()  // FIXME
       });
     }
   };
@@ -171,28 +172,27 @@ function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
 
   const offerDesc = new RTCSessionDescription(offer);
   console.log("Setting offer");
-  remotePeerConn.setRemoteDescription(offerDesc);
-  remotePeerConn.createAnswer({})
-    .then(answerDesc => remotePeerConn.setLocalDescription(answerDesc))
-    .catch(err => console.warn("Couldn't create answer"));
+  await peerConn.setRemoteDescription(offerDesc);
+  const answerDesc = await peerConn.createAnswer({});
+  await peerConn.setLocalDescription(answerDesc);
 }
 
-function handleSignalingMsgAnswer(signalingMsgAnswer: SignalingMsgAnswer) {
-  if (signalingMsgAnswer.toClientId !== myClientId) return;
-  if (signalingMsgAnswer.fromClientId === myClientId) return;
+async function handleSignalingMsgAnswer(signalingMsgAnswer: SignalingMsgAnswer) {
+  if (signalingMsgAnswer.toSessionId !== mySessionId) return;
+  if (signalingMsgAnswer.fromSessionId === mySessionId) return;
 
-  const fromClientId = signalingMsgAnswer.fromClientId;
-  console.log("Received answer from", fromClientId);
+  const fromSessionId = signalingMsgAnswer.fromSessionId;
+  console.log("Received answer from", fromSessionId);
 
   const answer = signalingMsgAnswer.answer;
-  const peerConn = peerConns.get(fromClientId);
+  const peerConn = peerConns.get(fromSessionId);
 
   if (peerConn === undefined) {
     throw new Error("Unexpected answer from a peer we never sent an offer to!");
   }
 
   console.log("Setting answer");
-  peerConn.setRemoteDescription(new RTCSessionDescription(answer));
+  await peerConn.setRemoteDescription(new RTCSessionDescription(answer));
 }
 
 ablyChatRoomSignalingChannel.subscribe(ablyMessage => {

@@ -4,8 +4,8 @@ function assertUnreachable(x) {
 }
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer");
-const myClientId = Math.random().toString();
-console.log("I am:", myClientId);
+const mySessionId = Math.random().toString();
+console.log("I am:", mySessionId);
 const peerConns = new Map();
 const dataChannels = new Map();
 window.dataChannels = dataChannels;
@@ -34,7 +34,7 @@ function publishSignalingMsg(signalingMsg) {
 }
 ablyClient.connection.on("connected", () => {
   console.log("Connected to Ably");
-  publishSignalingMsg({kind: "hello", fromClientId: myClientId});
+  publishSignalingMsg({kind: "hello", fromSessionId: mySessionId});
 });
 ablyClient.connection.on("failed", () => {
   console.error("Ably connection failed");
@@ -50,72 +50,74 @@ function getOrCreatePeerConnection(uid) {
   }
   return peerConn;
 }
-function handleSignalingMsgHello(signalingMsgHello) {
-  if (signalingMsgHello.fromClientId === myClientId)
+async function handleSignalingMsgHello(signalingMsgHello) {
+  if (signalingMsgHello.fromSessionId === mySessionId)
     return;
-  const newUserClientId = signalingMsgHello.fromClientId;
-  console.log("Received hello from", newUserClientId);
+  const newSessionId = signalingMsgHello.fromSessionId;
+  console.log("Received hello from", newSessionId);
   const peerConn = newPeerConnection();
-  peerConns.set(newUserClientId, peerConn);
+  peerConns.set(newSessionId, peerConn);
   const dataChannel = peerConn.createDataChannel("myDataChannel");
-  dataChannels.set(newUserClientId, dataChannel);
+  dataChannels.set(newSessionId, dataChannel);
   dataChannel.onmessage = (ev) => show(ev.data);
-  peerConn.createOffer({}).then((desc) => peerConn.setLocalDescription(desc)).then(() => {
-  }).catch((err) => console.error(err));
   peerConn.onicecandidate = (ev) => {
-    if (ev.candidate == null) {
+    if (ev.candidate !== null) {
+      ev.candidate;
       publishSignalingMsg({
         kind: "offer",
-        fromClientId: myClientId,
-        toClientId: newUserClientId,
+        fromSessionId: mySessionId,
+        toSessionId: newSessionId,
         offer: peerConn.localDescription?.toJSON()
       });
     }
   };
+  const desc = await peerConn.createOffer({});
+  await peerConn.setLocalDescription(desc);
 }
-function handleSignalingMsgOffer(signalingMsgOffer) {
-  if (signalingMsgOffer.toClientId !== myClientId)
+async function handleSignalingMsgOffer(signalingMsgOffer) {
+  if (signalingMsgOffer.toSessionId !== mySessionId)
     return;
-  if (signalingMsgOffer.fromClientId === myClientId)
+  if (signalingMsgOffer.fromSessionId === mySessionId)
     return;
-  const fromClientId = signalingMsgOffer.fromClientId;
-  console.log("Received offer from", fromClientId);
-  const remotePeerConn = getOrCreatePeerConnection(fromClientId);
-  remotePeerConn.ondatachannel = (dataChannelEv) => {
+  const fromSessionId = signalingMsgOffer.fromSessionId;
+  console.log("Received offer from", fromSessionId);
+  const peerConn = getOrCreatePeerConnection(fromSessionId);
+  peerConn.ondatachannel = (dataChannelEv) => {
     const dataChannel = dataChannelEv.channel;
-    dataChannels.set(fromClientId, dataChannel);
+    dataChannels.set(fromSessionId, dataChannel);
     dataChannel.onmessage = (msgEv) => show(msgEv.data);
   };
-  remotePeerConn.onicecandidate = (ev) => {
+  peerConn.onicecandidate = (ev) => {
     if (ev.candidate == null) {
       publishSignalingMsg({
         kind: "answer",
-        fromClientId: myClientId,
-        toClientId: signalingMsgOffer.fromClientId,
-        answer: remotePeerConn.localDescription?.toJSON()
+        fromSessionId: mySessionId,
+        toSessionId: signalingMsgOffer.fromSessionId,
+        answer: peerConn.localDescription?.toJSON()
       });
     }
   };
   const offer = signalingMsgOffer.offer;
   const offerDesc = new RTCSessionDescription(offer);
   console.log("Setting offer");
-  remotePeerConn.setRemoteDescription(offerDesc);
-  remotePeerConn.createAnswer({}).then((answerDesc) => remotePeerConn.setLocalDescription(answerDesc)).catch((err) => console.warn("Couldn't create answer"));
+  await peerConn.setRemoteDescription(offerDesc);
+  const answerDesc = await peerConn.createAnswer({});
+  await peerConn.setLocalDescription(answerDesc);
 }
-function handleSignalingMsgAnswer(signalingMsgAnswer) {
-  if (signalingMsgAnswer.toClientId !== myClientId)
+async function handleSignalingMsgAnswer(signalingMsgAnswer) {
+  if (signalingMsgAnswer.toSessionId !== mySessionId)
     return;
-  if (signalingMsgAnswer.fromClientId === myClientId)
+  if (signalingMsgAnswer.fromSessionId === mySessionId)
     return;
-  const fromClientId = signalingMsgAnswer.fromClientId;
-  console.log("Received answer from", fromClientId);
+  const fromSessionId = signalingMsgAnswer.fromSessionId;
+  console.log("Received answer from", fromSessionId);
   const answer = signalingMsgAnswer.answer;
-  const peerConn = peerConns.get(fromClientId);
+  const peerConn = peerConns.get(fromSessionId);
   if (peerConn === void 0) {
     throw new Error("Unexpected answer from a peer we never sent an offer to!");
   }
   console.log("Setting answer");
-  peerConn.setRemoteDescription(new RTCSessionDescription(answer));
+  await peerConn.setRemoteDescription(new RTCSessionDescription(answer));
 }
 ablyChatRoomSignalingChannel.subscribe((ablyMessage) => {
   const signalingMsg = ablyMessage.data;
