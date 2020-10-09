@@ -60,6 +60,10 @@ function newPeer(sessionId) {
   const peerConn = newPeerConnection();
   peerConn.onconnectionstatechange = (ev) => {
     console.log("State of connection to ", sessionId, ":", peerConn.connectionState);
+    if (peerConn.connectionState === "closed" || peerConn.connectionState === "disconnected" || peerConn.connectionState === "failed") {
+      console.log(`Cleaning up ${sessionId}`);
+      peers.delete(sessionId);
+    }
   };
   const peer = {id: sessionId, peerConn, dataChannel: void 0};
   peers.set(sessionId, peer);

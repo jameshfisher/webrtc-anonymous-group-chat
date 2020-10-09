@@ -137,6 +137,14 @@ function newPeer(sessionId: SessionId): Peer {
   const peerConn = newPeerConnection();
   peerConn.onconnectionstatechange = ev => {
     console.log("State of connection to ", sessionId, ":", peerConn.connectionState);
+    if (
+      peerConn.connectionState === "closed" ||
+      peerConn.connectionState === "disconnected" || 
+      peerConn.connectionState === "failed"
+    ) {
+      console.log(`Cleaning up ${sessionId}`);
+      peers.delete(sessionId);
+    }
   };
   const peer = { id: sessionId, peerConn: peerConn, dataChannel: undefined };
   peers.set(sessionId, peer);
