@@ -34,14 +34,18 @@ msgBufferInputEl.onkeydown = (ev) => {
 const ablyClient = new Realtime({
   key: "IOh7bg.2hQ82w:DFd_OB1D2kVJBCag"
 });
-let ablyChatRoomSignalingChannel = ablyClient.channels.get("global");
-function publishSignalingMsg(signalingMsg) {
-  console.log("Publishing", signalingMsg);
-  ablyChatRoomSignalingChannel.publish("signaling-msg", signalingMsg);
+let ablyChatRoomHelloChannel = ablyClient.channels.get("global");
+let ablyMyPrivateChannel = ablyClient.channels.get(mySessionId);
+function publishSignalingMsg(toSessionId, signalingMsg) {
+  console.log("Sending to", toSessionId, ":", signalingMsg);
+  const remoteSessionAblyChannel = ablyClient.channels.get(toSessionId);
+  remoteSessionAblyChannel.publish("signaling-msg", signalingMsg);
 }
 ablyClient.connection.on("connected", () => {
   console.log("Connected to Ably");
-  publishSignalingMsg({kind: "hello", fromSessionId: mySessionId});
+  const msg = {fromSessionId: mySessionId};
+  console.log("Publishing hello", msg);
+  ablyChatRoomHelloChannel.publish("hello", msg);
 });
 ablyClient.connection.on("failed", () => {
   console.error("Ably connection failed");
@@ -65,35 +69,30 @@ function setUpDataChannel(dataChannel, peer) {
   peer.dataChannel = dataChannel;
   dataChannel.onmessage = (msgEv) => show(`${peer.id} says: ${msgEv.data}`);
 }
-async function handleSignalingMsgHello(signalingMsgHello) {
-  if (signalingMsgHello.fromSessionId === mySessionId)
+async function handleHello(remoteSessionId) {
+  if (remoteSessionId === mySessionId)
     return;
-  const remoteSessionId = signalingMsgHello.fromSessionId;
   console.log("Received hello from", remoteSessionId);
   const peer = newPeer(remoteSessionId);
   setUpDataChannel(peer.peerConn.createDataChannel("myDataChannel"), peer);
   peer.peerConn.onicecandidate = (ev) => {
     if (ev.candidate !== null) {
-      publishSignalingMsg({
+      publishSignalingMsg(remoteSessionId, {
         kind: "ice-candidate",
         fromSessionId: mySessionId,
-        toSessionId: remoteSessionId,
         candidate: ev.candidate
       });
     }
   };
   const desc = await peer.peerConn.createOffer();
   await peer.peerConn.setLocalDescription(desc);
-  publishSignalingMsg({
+  publishSignalingMsg(remoteSessionId, {
     kind: "offer",
     fromSessionId: mySessionId,
-    toSessionId: remoteSessionId,
     offer: desc
   });
 }
 async function handleSignalingMsgOffer(signalingMsgOffer) {
-  if (signalingMsgOffer.toSessionId !== mySessionId)
-    return;
   if (signalingMsgOffer.fromSessionId === mySessionId)
     return;
   const fromSessionId = signalingMsgOffer.fromSessionId;
@@ -105,10 +104,9 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
   };
   peer.peerConn.onicecandidate = (ev) => {
     if (ev.candidate !== null) {
-      publishSignalingMsg({
+      publishSignalingMsg(fromSessionId, {
         kind: "ice-candidate",
         fromSessionId: mySessionId,
-        toSessionId: fromSessionId,
         candidate: ev.candidate
       });
     }
@@ -117,16 +115,13 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
   await peer.peerConn.setRemoteDescription(offer);
   const answerDesc = await peer.peerConn.createAnswer();
   await peer.peerConn.setLocalDescription(answerDesc);
-  publishSignalingMsg({
+  publishSignalingMsg(signalingMsgOffer.fromSessionId, {
     kind: "answer",
     fromSessionId: mySessionId,
-    toSessionId: signalingMsgOffer.fromSessionId,
     answer: answerDesc
   });
 }
 async function handleSignalingMsgAnswer(signalingMsgAnswer) {
-  if (signalingMsgAnswer.toSessionId !== mySessionId)
-    return;
   if (signalingMsgAnswer.fromSessionId === mySessionId)
     return;
   const fromSessionId = signalingMsgAnswer.fromSessionId;
@@ -140,8 +135,6 @@ async function handleSignalingMsgAnswer(signalingMsgAnswer) {
   await peer.peerConn.setRemoteDescription(answer);
 }
 async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate) {
-  if (signalingMsgIceCandidate.toSessionId !== mySessionId)
-    return;
   if (signalingMsgIceCandidate.fromSessionId === mySessionId)
     return;
   const fromSessionId = signalingMsgIceCandidate.fromSessionId;
@@ -152,11 +145,15 @@ async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate) {
   }
   await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
 }
-ablyChatRoomSignalingChannel.subscribe((ablyMessage) => {
+ablyChatRoomHelloChannel.subscribe((ablyMessage) => {
+  if (!ablyMessage.data)
+    return;
   const signalingMsg = ablyMessage.data;
-  if (signalingMsg.kind === "hello") {
-    handleSignalingMsgHello(signalingMsg);
-  } else if (signalingMsg.kind === "offer") {
+  handleHello(signalingMsg.fromSessionId);
+});
+ablyMyPrivateChannel.subscribe((ablyMessage) => {
+  const signalingMsg = ablyMessage.data;
+  if (signalingMsg.kind === "offer") {
     handleSignalingMsgOffer(signalingMsg);
   } else if (signalingMsg.kind === "answer") {
     handleSignalingMsgAnswer(signalingMsg);
