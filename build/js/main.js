@@ -69,6 +69,15 @@ function newPeer(sessionId) {
       peers.delete(sessionId);
     }
   };
+  peerConn.onicecandidate = (ev) => {
+    if (ev.candidate !== null) {
+      publishSignalingMsg(sessionId, {
+        kind: "ice-candidate",
+        fromSessionId: mySessionId,
+        candidate: ev.candidate
+      });
+    }
+  };
   const peer = {id: sessionId, peerConn, dataChannel: void 0};
   peers.set(sessionId, peer);
   return peer;
@@ -90,15 +99,6 @@ async function handleHello(remoteSessionId) {
     peer.peerConn.addTrack(track, localMediaStream);
   }
   setUpDataChannel(peer.peerConn.createDataChannel("myDataChannel"), peer);
-  peer.peerConn.onicecandidate = (ev) => {
-    if (ev.candidate !== null) {
-      publishSignalingMsg(remoteSessionId, {
-        kind: "ice-candidate",
-        fromSessionId: mySessionId,
-        candidate: ev.candidate
-      });
-    }
-  };
   const desc = await peer.peerConn.createOffer();
   await peer.peerConn.setLocalDescription(desc);
   publishSignalingMsg(remoteSessionId, {
@@ -119,15 +119,6 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
   peer.peerConn.ondatachannel = (dataChannelEv) => {
     const dataChannel = dataChannelEv.channel;
     setUpDataChannel(dataChannel, peer);
-  };
-  peer.peerConn.onicecandidate = (ev) => {
-    if (ev.candidate !== null) {
-      publishSignalingMsg(fromSessionId, {
-        kind: "ice-candidate",
-        fromSessionId: mySessionId,
-        candidate: ev.candidate
-      });
-    }
   };
   peer.peerConn.ontrack = (ev) => {
     const remoteVideoEl = document.createElement("video");

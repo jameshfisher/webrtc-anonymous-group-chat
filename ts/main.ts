@@ -148,6 +148,20 @@ function newPeer(sessionId: SessionId): Peer {
       peers.delete(sessionId);
     }
   };
+
+  peerConn.onicecandidate = ev => {
+    if (ev.candidate !== null) {
+      publishSignalingMsg(
+        sessionId,
+        {
+          kind: "ice-candidate",
+          fromSessionId: mySessionId, 
+          candidate: ev.candidate
+        }
+      );
+    }
+  };
+
   const peer = { id: sessionId, peerConn: peerConn, dataChannel: undefined };
   peers.set(sessionId, peer);
   return peer;
@@ -177,19 +191,6 @@ async function handleHello(remoteSessionId: SessionId) {
 
   setUpDataChannel(peer.peerConn.createDataChannel('myDataChannel'), peer);
 
-  peer.peerConn.onicecandidate = ev => {
-    if (ev.candidate !== null) {
-      publishSignalingMsg(
-        remoteSessionId,
-        {
-          kind: "ice-candidate",
-          fromSessionId: mySessionId, 
-          candidate: ev.candidate
-        }
-      );
-    }
-  };
-
   const desc = await peer.peerConn.createOffer();
   await peer.peerConn.setLocalDescription(desc);
   publishSignalingMsg(
@@ -217,19 +218,6 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
   peer.peerConn.ondatachannel = dataChannelEv => {
     const dataChannel = dataChannelEv.channel;
     setUpDataChannel(dataChannel, peer);
-  };
-
-  peer.peerConn.onicecandidate = ev => {
-    if (ev.candidate !== null) {
-      publishSignalingMsg(
-        fromSessionId,
-        {
-          kind: "ice-candidate",
-          fromSessionId: mySessionId, 
-          candidate: ev.candidate
-        }
-      );
-    }
   };
 
   peer.peerConn.ontrack = ev => {
