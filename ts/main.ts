@@ -103,11 +103,11 @@ function newPeerConnection(): RTCPeerConnection {
   return new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
 }
 
-function getOrCreatePeerConnection(uid: SessionId): RTCPeerConnection {
-  let peerConn = peerConns.get(uid);
+function getOrCreatePeerConnection(sessionId: SessionId): RTCPeerConnection {
+  let peerConn = peerConns.get(sessionId);
   if (peerConn === undefined) {
     peerConn = newPeerConnection();
-    peerConns.set(uid, peerConn);
+    peerConns.set(sessionId, peerConn);
   }
   return peerConn;
 }
