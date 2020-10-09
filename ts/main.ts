@@ -190,13 +190,17 @@ async function handleHello(remoteSessionId: SessionId) {
   );
 }
 
+function getOrCreatePeer(remoteSessionId: SessionId): Peer {
+  return peers.get(remoteSessionId) || newPeer(remoteSessionId);
+}
+
 async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
   if (signalingMsgOffer.fromSessionId === mySessionId) return;
 
   const fromSessionId = signalingMsgOffer.fromSessionId;
   console.log("Received offer from", fromSessionId);
 
-  const peer = newPeer(fromSessionId);
+  const peer = getOrCreatePeer(fromSessionId);
 
   peer.peerConn.ondatachannel = dataChannelEv => {
     const dataChannel = dataChannelEv.channel;
@@ -255,13 +259,8 @@ async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate: Signalin
   const fromSessionId = signalingMsgIceCandidate.fromSessionId;
   console.log("Received ICE candidate from", fromSessionId);
 
-  const peer = peers.get(fromSessionId);
+  const peer = getOrCreatePeer(fromSessionId);
   
-  if (peer === undefined) {
-    // FIXME this could actually be possible?
-    throw new Error("Unexpected ICE candidate from a peer we don't know about yet");
-  }
-
   await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
 }
 

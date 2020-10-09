@@ -96,12 +96,15 @@ async function handleHello(remoteSessionId) {
     offer: desc
   });
 }
+function getOrCreatePeer(remoteSessionId) {
+  return peers.get(remoteSessionId) || newPeer(remoteSessionId);
+}
 async function handleSignalingMsgOffer(signalingMsgOffer) {
   if (signalingMsgOffer.fromSessionId === mySessionId)
     return;
   const fromSessionId = signalingMsgOffer.fromSessionId;
   console.log("Received offer from", fromSessionId);
-  const peer = newPeer(fromSessionId);
+  const peer = getOrCreatePeer(fromSessionId);
   peer.peerConn.ondatachannel = (dataChannelEv) => {
     const dataChannel = dataChannelEv.channel;
     setUpDataChannel(dataChannel, peer);
@@ -143,10 +146,7 @@ async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate) {
     return;
   const fromSessionId = signalingMsgIceCandidate.fromSessionId;
   console.log("Received ICE candidate from", fromSessionId);
-  const peer = peers.get(fromSessionId);
-  if (peer === void 0) {
-    throw new Error("Unexpected ICE candidate from a peer we don't know about yet");
-  }
+  const peer = getOrCreatePeer(fromSessionId);
   await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
 }
 ablyChatRoomHelloChannel.subscribe((ablyMessage) => {
