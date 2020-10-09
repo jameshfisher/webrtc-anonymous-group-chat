@@ -54,6 +54,10 @@ function getOrCreatePeerConnection(sessionId) {
   }
   return peerConn;
 }
+function setUpDataChannel(dataChannel, remoteSessionId) {
+  dataChannels.set(remoteSessionId, dataChannel);
+  dataChannel.onmessage = (msgEv) => show(`${remoteSessionId} says: ${msgEv.data}`);
+}
 async function handleSignalingMsgHello(signalingMsgHello) {
   if (signalingMsgHello.fromSessionId === mySessionId)
     return;
@@ -64,9 +68,7 @@ async function handleSignalingMsgHello(signalingMsgHello) {
   peerConn.onconnectionstatechange = (ev) => {
     console.log("Connection state to ", newSessionId, ":", peerConn.connectionState);
   };
-  const dataChannel = peerConn.createDataChannel("myDataChannel");
-  dataChannels.set(newSessionId, dataChannel);
-  dataChannel.onmessage = (ev) => show(ev.data);
+  setUpDataChannel(peerConn.createDataChannel("myDataChannel"), newSessionId);
   peerConn.onicecandidate = (ev) => {
     if (ev.candidate !== null) {
       publishSignalingMsg({
@@ -99,8 +101,7 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
   };
   peerConn.ondatachannel = (dataChannelEv) => {
     const dataChannel = dataChannelEv.channel;
-    dataChannels.set(fromSessionId, dataChannel);
-    dataChannel.onmessage = (msgEv) => show(msgEv.data);
+    setUpDataChannel(dataChannel, fromSessionId);
   };
   peerConn.onicecandidate = (ev) => {
     if (ev.candidate !== null) {

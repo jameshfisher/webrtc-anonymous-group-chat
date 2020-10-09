@@ -60,6 +60,7 @@ const msgBufferInputEl = document.getElementById("msgBuffer") as HTMLInputElemen
 const mySessionId =  Math.random().toString();  // FIXME uuid
 console.log("I am:", mySessionId);
 
+// TODO clean up conns on state disconnected/failed
 const peerConns: Map<SessionId, RTCPeerConnection> = new Map();
 const dataChannels: Map<SessionId, RTCDataChannel> = new Map();
 
@@ -123,6 +124,11 @@ function getOrCreatePeerConnection(sessionId: SessionId): RTCPeerConnection {
   return peerConn;
 }
 
+function setUpDataChannel(dataChannel: RTCDataChannel, remoteSessionId: SessionId) {
+  dataChannels.set(remoteSessionId, dataChannel);
+  dataChannel.onmessage = msgEv => show(`${remoteSessionId} says: ${msgEv.data}`);
+}
+
 async function handleSignalingMsgHello(signalingMsgHello: SignalingMsgHello) {
   if (signalingMsgHello.fromSessionId === mySessionId) return;
 
@@ -136,10 +142,7 @@ async function handleSignalingMsgHello(signalingMsgHello: SignalingMsgHello) {
     console.log("Connection state to ", newSessionId, ":", peerConn.connectionState);
   };
 
-  const dataChannel = peerConn.createDataChannel('myDataChannel');
-  dataChannels.set(newSessionId, dataChannel);
-
-  dataChannel.onmessage = ev => show(ev.data);
+  setUpDataChannel(peerConn.createDataChannel('myDataChannel'), newSessionId);
 
   peerConn.onicecandidate = ev => {
     if (ev.candidate !== null) {
@@ -177,8 +180,7 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
 
   peerConn.ondatachannel = dataChannelEv => {
     const dataChannel = dataChannelEv.channel;
-    dataChannels.set(fromSessionId, dataChannel);
-    dataChannel.onmessage = msgEv => show(msgEv.data);
+    setUpDataChannel(dataChannel, fromSessionId);
   };
 
   peerConn.onicecandidate = ev => {
