@@ -97,7 +97,8 @@ msgBufferInputEl.onkeydown = ev => {
 };
 
 const ablyClient = new Realtime({
-  key: 'IOh7bg.2hQ82w:DFd_OB1D2kVJBCag' // this key has subscribe and publish perms
+  key: 'IOh7bg.2hQ82w:DFd_OB1D2kVJBCag', // this key has subscribe and publish perms
+  autoConnect: false
 });
 
 // For now we have one global chat room
@@ -111,19 +112,6 @@ function publishSignalingMsg(toSessionId: SessionId, signalingMsg: SignalingMsg)
   // FIXME not sure if we need to wait until connected before publishing.
   remoteSessionAblyChannel.publish('signaling-msg', signalingMsg);
 }
-
-ablyClient.connection.on('connected', () => {
-  console.log("Connected to Ably");
-  // Note that we will also receive this after publishing it
-  // FIXME not sure if we need to wait until connected before publishing.
-  const msg: MsgHello = { fromSessionId: mySessionId };
-  console.log("Publishing hello", msg);
-  ablyChatRoomHelloChannel.publish('hello', msg);
-});
-
-ablyClient.connection.on('failed', () => {
-  console.error("Ably connection failed");
-});
 
 function newPeerConnection(): RTCPeerConnection {
   return new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
@@ -268,25 +256,46 @@ async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate: Signalin
   await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
 }
 
-ablyChatRoomHelloChannel.subscribe(ablyMessage => {
-  if (!ablyMessage.data) return;
-  const signalingMsg = ablyMessage.data as MsgHello;
-  handleHello(signalingMsg.fromSessionId);
+ablyClient.connect();
+
+ablyClient.connection.on('connected', async () => {
+  console.log("Connected to Ably");
+
+  await Promise.all([
+    ablyChatRoomHelloChannel.subscribe(ablyMessage => {
+      if (!ablyMessage.data) return;
+      const signalingMsg = ablyMessage.data as MsgHello;
+      handleHello(signalingMsg.fromSessionId);
+    }),
+    ablyMyPrivateChannel.subscribe(ablyMessage => {
+      const signalingMsg = ablyMessage.data as SignalingMsg;
+    
+      if (signalingMsg.kind === "offer") {
+        handleSignalingMsgOffer(signalingMsg);
+      }
+      else if (signalingMsg.kind === "answer") {
+        handleSignalingMsgAnswer(signalingMsg);
+      }
+      else if (signalingMsg.kind === "ice-candidate") {
+        handleSignalingMsgIceCandidate(signalingMsg);
+      }
+      else {
+        assertUnreachable(signalingMsg);
+      }
+    })
+  ]);
+
+  console.log("Subscribed to all channels");
+
+  // Wait until we're connected and subscribed before sending 'hello'.
+  // Otherwise, peers might reply before we can receive their reply,
+  // and so we'll never connect.
+
+  const msg: MsgHello = { fromSessionId: mySessionId };
+  console.log("Publishing hello", msg);
+  ablyChatRoomHelloChannel.publish('hello', msg);
 });
 
-ablyMyPrivateChannel.subscribe(ablyMessage => {
-  const signalingMsg = ablyMessage.data as SignalingMsg;
-
-  if (signalingMsg.kind === "offer") {
-    handleSignalingMsgOffer(signalingMsg);
-  }
-  else if (signalingMsg.kind === "answer") {
-    handleSignalingMsgAnswer(signalingMsg);
-  }
-  else if (signalingMsg.kind === "ice-candidate") {
-    handleSignalingMsgIceCandidate(signalingMsg);
-  }
-  else {
-    assertUnreachable(signalingMsg);
-  }
+ablyClient.connection.on('failed', () => {
+  console.error("Ably connection failed");
 });

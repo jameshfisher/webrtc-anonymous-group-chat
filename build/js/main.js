@@ -32,7 +32,8 @@ msgBufferInputEl.onkeydown = (ev) => {
   }
 };
 const ablyClient = new Realtime({
-  key: "IOh7bg.2hQ82w:DFd_OB1D2kVJBCag"
+  key: "IOh7bg.2hQ82w:DFd_OB1D2kVJBCag",
+  autoConnect: false
 });
 let ablyChatRoomHelloChannel = ablyClient.channels.get("global");
 let ablyMyPrivateChannel = ablyClient.channels.get(mySessionId);
@@ -41,15 +42,6 @@ function publishSignalingMsg(toSessionId, signalingMsg) {
   const remoteSessionAblyChannel = ablyClient.channels.get(toSessionId);
   remoteSessionAblyChannel.publish("signaling-msg", signalingMsg);
 }
-ablyClient.connection.on("connected", () => {
-  console.log("Connected to Ably");
-  const msg = {fromSessionId: mySessionId};
-  console.log("Publishing hello", msg);
-  ablyChatRoomHelloChannel.publish("hello", msg);
-});
-ablyClient.connection.on("failed", () => {
-  console.error("Ably connection failed");
-});
 function newPeerConnection() {
   return new RTCPeerConnection({iceServers: [{urls: ["stun:stun.l.google.com:19302"]}]});
 }
@@ -152,21 +144,34 @@ async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate) {
   const peer = getOrCreatePeer(fromSessionId);
   await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
 }
-ablyChatRoomHelloChannel.subscribe((ablyMessage) => {
-  if (!ablyMessage.data)
-    return;
-  const signalingMsg = ablyMessage.data;
-  handleHello(signalingMsg.fromSessionId);
+ablyClient.connect();
+ablyClient.connection.on("connected", async () => {
+  console.log("Connected to Ably");
+  await Promise.all([
+    ablyChatRoomHelloChannel.subscribe((ablyMessage) => {
+      if (!ablyMessage.data)
+        return;
+      const signalingMsg = ablyMessage.data;
+      handleHello(signalingMsg.fromSessionId);
+    }),
+    ablyMyPrivateChannel.subscribe((ablyMessage) => {
+      const signalingMsg = ablyMessage.data;
+      if (signalingMsg.kind === "offer") {
+        handleSignalingMsgOffer(signalingMsg);
+      } else if (signalingMsg.kind === "answer") {
+        handleSignalingMsgAnswer(signalingMsg);
+      } else if (signalingMsg.kind === "ice-candidate") {
+        handleSignalingMsgIceCandidate(signalingMsg);
+      } else {
+        assertUnreachable(signalingMsg);
+      }
+    })
+  ]);
+  console.log("Subscribed to all channels");
+  const msg = {fromSessionId: mySessionId};
+  console.log("Publishing hello", msg);
+  ablyChatRoomHelloChannel.publish("hello", msg);
 });
-ablyMyPrivateChannel.subscribe((ablyMessage) => {
-  const signalingMsg = ablyMessage.data;
-  if (signalingMsg.kind === "offer") {
-    handleSignalingMsgOffer(signalingMsg);
-  } else if (signalingMsg.kind === "answer") {
-    handleSignalingMsgAnswer(signalingMsg);
-  } else if (signalingMsg.kind === "ice-candidate") {
-    handleSignalingMsgIceCandidate(signalingMsg);
-  } else {
-    assertUnreachable(signalingMsg);
-  }
+ablyClient.connection.on("failed", () => {
+  console.error("Ably connection failed");
 });
