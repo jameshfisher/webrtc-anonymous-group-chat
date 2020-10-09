@@ -131,7 +131,7 @@ function newPeerConnection(): RTCPeerConnection {
 
 function newPeer(sessionId: SessionId): Peer {
   if (peers.has(sessionId)) {
-    throw new Error("Received hello/offer from existing peer!");
+    throw new Error(`Error: we already have a peer with sessionId ${sessionId}`);
   }
 
   const peerConn = newPeerConnection();
@@ -157,7 +157,11 @@ function setUpDataChannel(dataChannel: RTCDataChannel, peer: Peer) {
 }
 
 async function handleHello(remoteSessionId: SessionId) {
-  if (remoteSessionId === mySessionId) return;
+  if (remoteSessionId === mySessionId) return; // Expected; this is how Ably works
+
+  if (peers.has(remoteSessionId)) {
+    throw new Error("Received hello from existing peer!");
+  }
 
   console.log("Received hello from", remoteSessionId);
 

@@ -55,7 +55,7 @@ function newPeerConnection() {
 }
 function newPeer(sessionId) {
   if (peers.has(sessionId)) {
-    throw new Error("Received hello/offer from existing peer!");
+    throw new Error(`Error: we already have a peer with sessionId ${sessionId}`);
   }
   const peerConn = newPeerConnection();
   peerConn.onconnectionstatechange = (ev) => {
@@ -76,6 +76,9 @@ function setUpDataChannel(dataChannel, peer) {
 async function handleHello(remoteSessionId) {
   if (remoteSessionId === mySessionId)
     return;
+  if (peers.has(remoteSessionId)) {
+    throw new Error("Received hello from existing peer!");
+  }
   console.log("Received hello from", remoteSessionId);
   const peer = newPeer(remoteSessionId);
   setUpDataChannel(peer.peerConn.createDataChannel("myDataChannel"), peer);
