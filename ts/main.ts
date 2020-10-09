@@ -128,6 +128,10 @@ async function handleSignalingMsgHello(signalingMsgHello: SignalingMsgHello) {
   const peerConn = newPeerConnection();
   peerConns.set(newSessionId, peerConn);
 
+  peerConn.onconnectionstatechange = ev => {
+    console.log("Connection state to ", newSessionId, ":", peerConn.connectionState);
+  };
+
   const dataChannel = peerConn.createDataChannel('myDataChannel');
   dataChannels.set(newSessionId, dataChannel);
 
@@ -162,6 +166,10 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
   console.log("Received offer from", fromSessionId);
 
   const peerConn = getOrCreatePeerConnection(fromSessionId);
+
+  peerConn.onconnectionstatechange = ev => {
+    console.log("Connection state to ", fromSessionId, ":", peerConn.connectionState);
+  };
 
   peerConn.ondatachannel = dataChannelEv => {
     const dataChannel = dataChannelEv.channel;
