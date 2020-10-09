@@ -42,11 +42,11 @@ ablyClient.connection.on("failed", () => {
 function newPeerConnection() {
   return new RTCPeerConnection({iceServers: [{urls: ["stun:stun.l.google.com:19302"]}]});
 }
-function getOrCreatePeerConnection(uid) {
-  let peerConn = peerConns.get(uid);
+function getOrCreatePeerConnection(sessionId) {
+  let peerConn = peerConns.get(sessionId);
   if (peerConn === void 0) {
     peerConn = newPeerConnection();
-    peerConns.set(uid, peerConn);
+    peerConns.set(sessionId, peerConn);
   }
   return peerConn;
 }
@@ -62,17 +62,22 @@ async function handleSignalingMsgHello(signalingMsgHello) {
   dataChannel.onmessage = (ev) => show(ev.data);
   peerConn.onicecandidate = (ev) => {
     if (ev.candidate !== null) {
-      ev.candidate;
       publishSignalingMsg({
-        kind: "offer",
+        kind: "ice-candidate",
         fromSessionId: mySessionId,
         toSessionId: newSessionId,
-        offer: peerConn.localDescription?.toJSON()
+        candidate: ev.candidate
       });
     }
   };
-  const desc = await peerConn.createOffer({});
+  const desc = await peerConn.createOffer();
   await peerConn.setLocalDescription(desc);
+  publishSignalingMsg({
+    kind: "offer",
+    fromSessionId: mySessionId,
+    toSessionId: newSessionId,
+    offer: desc
+  });
 }
 async function handleSignalingMsgOffer(signalingMsgOffer) {
   if (signalingMsgOffer.toSessionId !== mySessionId)
@@ -88,21 +93,25 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
     dataChannel.onmessage = (msgEv) => show(msgEv.data);
   };
   peerConn.onicecandidate = (ev) => {
-    if (ev.candidate == null) {
+    if (ev.candidate !== null) {
       publishSignalingMsg({
-        kind: "answer",
+        kind: "ice-candidate",
         fromSessionId: mySessionId,
-        toSessionId: signalingMsgOffer.fromSessionId,
-        answer: peerConn.localDescription?.toJSON()
+        toSessionId: fromSessionId,
+        candidate: ev.candidate
       });
     }
   };
   const offer = signalingMsgOffer.offer;
-  const offerDesc = new RTCSessionDescription(offer);
-  console.log("Setting offer");
-  await peerConn.setRemoteDescription(offerDesc);
-  const answerDesc = await peerConn.createAnswer({});
+  await peerConn.setRemoteDescription(offer);
+  const answerDesc = await peerConn.createAnswer();
   await peerConn.setLocalDescription(answerDesc);
+  publishSignalingMsg({
+    kind: "answer",
+    fromSessionId: mySessionId,
+    toSessionId: signalingMsgOffer.fromSessionId,
+    answer: answerDesc
+  });
 }
 async function handleSignalingMsgAnswer(signalingMsgAnswer) {
   if (signalingMsgAnswer.toSessionId !== mySessionId)
@@ -111,13 +120,26 @@ async function handleSignalingMsgAnswer(signalingMsgAnswer) {
     return;
   const fromSessionId = signalingMsgAnswer.fromSessionId;
   console.log("Received answer from", fromSessionId);
-  const answer = signalingMsgAnswer.answer;
   const peerConn = peerConns.get(fromSessionId);
   if (peerConn === void 0) {
     throw new Error("Unexpected answer from a peer we never sent an offer to!");
   }
   console.log("Setting answer");
-  await peerConn.setRemoteDescription(new RTCSessionDescription(answer));
+  const answer = signalingMsgAnswer.answer;
+  await peerConn.setRemoteDescription(answer);
+}
+async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate) {
+  if (signalingMsgIceCandidate.toSessionId !== mySessionId)
+    return;
+  if (signalingMsgIceCandidate.fromSessionId === mySessionId)
+    return;
+  const fromSessionId = signalingMsgIceCandidate.fromSessionId;
+  console.log("Received ICE candidate from", fromSessionId);
+  const peerConn = peerConns.get(fromSessionId);
+  if (peerConn === void 0) {
+    throw new Error("Unexpected ICE candidate from a peer we don't know about yet");
+  }
+  await peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
 }
 ablyChatRoomSignalingChannel.subscribe((ablyMessage) => {
   const signalingMsg = ablyMessage.data;
@@ -127,6 +149,8 @@ ablyChatRoomSignalingChannel.subscribe((ablyMessage) => {
     handleSignalingMsgOffer(signalingMsg);
   } else if (signalingMsg.kind === "answer") {
     handleSignalingMsgAnswer(signalingMsg);
+  } else if (signalingMsg.kind === "ice-candidate") {
+    handleSignalingMsgIceCandidate(signalingMsg);
   } else {
     assertUnreachable(signalingMsg);
   }

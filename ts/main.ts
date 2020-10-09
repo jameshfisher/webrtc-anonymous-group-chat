@@ -35,7 +35,14 @@ interface SignalingMsgAnswer {
   answer: RTCSessionDescriptionInit
 }
 
-type SignalingMsg = SignalingMsgHello | SignalingMsgOffer | SignalingMsgAnswer;
+interface SignalingMsgIceCandidate {
+  kind: "ice-candidate",
+  fromSessionId: SessionId,
+  toSessionId: SessionId,
+  candidate: RTCIceCandidate
+}
+
+type SignalingMsg = SignalingMsgHello | SignalingMsgOffer | SignalingMsgAnswer | SignalingMsgIceCandidate;
 
 function assertUnreachable(x: never): never {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
@@ -128,18 +135,23 @@ async function handleSignalingMsgHello(signalingMsgHello: SignalingMsgHello) {
 
   peerConn.onicecandidate = ev => {
     if (ev.candidate !== null) {
-      ev.candidate
-      publishSignalingMsg({ 
-        kind: "offer", 
+      publishSignalingMsg({
+        kind: "ice-candidate",
         fromSessionId: mySessionId, 
         toSessionId: newSessionId, 
-        offer: peerConn.localDescription?.toJSON()  // FIXME is this really an RTCSessionDescriptionInit
+        candidate: ev.candidate
       });
     }
   };
 
-  const desc = await peerConn.createOffer({});
+  const desc = await peerConn.createOffer();
   await peerConn.setLocalDescription(desc);
+  publishSignalingMsg({
+    kind: "offer", 
+    fromSessionId: mySessionId, 
+    toSessionId: newSessionId, 
+    offer: desc
+  });
 }
 
 async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
@@ -158,23 +170,28 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
   };
 
   peerConn.onicecandidate = ev => {
-    if (ev.candidate == null) {
+    if (ev.candidate !== null) {
       publishSignalingMsg({
-        kind: "answer", 
+        kind: "ice-candidate",
         fromSessionId: mySessionId, 
-        toSessionId: signalingMsgOffer.fromSessionId, 
-        answer: peerConn.localDescription?.toJSON()  // FIXME
+        toSessionId: fromSessionId, 
+        candidate: ev.candidate
       });
     }
   };
 
   const offer = signalingMsgOffer.offer;
 
-  const offerDesc = new RTCSessionDescription(offer);
-  console.log("Setting offer");
-  await peerConn.setRemoteDescription(offerDesc);
-  const answerDesc = await peerConn.createAnswer({});
+  await peerConn.setRemoteDescription(offer);
+  const answerDesc = await peerConn.createAnswer();
   await peerConn.setLocalDescription(answerDesc);
+
+  publishSignalingMsg({
+    kind: "answer", 
+    fromSessionId: mySessionId, 
+    toSessionId: signalingMsgOffer.fromSessionId, 
+    answer: answerDesc
+  });
 }
 
 async function handleSignalingMsgAnswer(signalingMsgAnswer: SignalingMsgAnswer) {
@@ -184,15 +201,32 @@ async function handleSignalingMsgAnswer(signalingMsgAnswer: SignalingMsgAnswer) 
   const fromSessionId = signalingMsgAnswer.fromSessionId;
   console.log("Received answer from", fromSessionId);
 
-  const answer = signalingMsgAnswer.answer;
   const peerConn = peerConns.get(fromSessionId);
-
+  
   if (peerConn === undefined) {
     throw new Error("Unexpected answer from a peer we never sent an offer to!");
   }
-
+  
   console.log("Setting answer");
-  await peerConn.setRemoteDescription(new RTCSessionDescription(answer));
+  const answer = signalingMsgAnswer.answer;
+  await peerConn.setRemoteDescription(answer);
+}
+
+async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate: SignalingMsgIceCandidate) {
+  if (signalingMsgIceCandidate.toSessionId !== mySessionId) return;
+  if (signalingMsgIceCandidate.fromSessionId === mySessionId) return;
+
+  const fromSessionId = signalingMsgIceCandidate.fromSessionId;
+  console.log("Received ICE candidate from", fromSessionId);
+
+  const peerConn = peerConns.get(fromSessionId);
+  
+  if (peerConn === undefined) {
+    // FIXME this could actually be possible?
+    throw new Error("Unexpected ICE candidate from a peer we don't know about yet");
+  }
+
+  await peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
 }
 
 ablyChatRoomSignalingChannel.subscribe(ablyMessage => {
@@ -205,6 +239,9 @@ ablyChatRoomSignalingChannel.subscribe(ablyMessage => {
   }
   else if (signalingMsg.kind === "answer") {
     handleSignalingMsgAnswer(signalingMsg);
+  }
+  else if (signalingMsg.kind === "ice-candidate") {
+    handleSignalingMsgIceCandidate(signalingMsg);
   }
   else {
     assertUnreachable(signalingMsg);
