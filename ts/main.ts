@@ -77,8 +77,12 @@ msgBufferInputEl.onkeydown = ev => {
     const msg = msgBufferInputEl.value;
     msgBufferInputEl.value = '';
     show(msg);
-    for (const dataChannel of dataChannels.values()) {
-      dataChannel.send(msg);
+    for (const [sessionId, dataChannel] of dataChannels.entries()) {
+      try {
+        dataChannel.send(msg);
+      } catch (err) {
+        console.error(`Error sending to ${sessionId}: ${err}`);
+      }
     }
   }
 };
