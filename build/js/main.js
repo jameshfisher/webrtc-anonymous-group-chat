@@ -2,8 +2,20 @@ import {Realtime} from "../web_modules/ably/promises.js";
 function assertUnreachable(x) {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
 }
+const localVideoEl = document.getElementById("localVideo");
+const remoteVideoEl = document.getElementById("remoteVideo");
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer");
+const localMediaStreamPromise = navigator.mediaDevices.getUserMedia({
+  video: {
+    width: {ideal: 360}
+  },
+  audio: false
+});
+(async () => {
+  const mediaStream = await localMediaStreamPromise;
+  localVideoEl.srcObject = mediaStream;
+})();
 const mySessionId = Math.random().toString();
 console.log("I am:", mySessionId);
 const peers = new Map();
@@ -73,6 +85,10 @@ async function handleHello(remoteSessionId) {
   }
   console.log("Received hello from", remoteSessionId);
   const peer = newPeer(remoteSessionId);
+  const localMediaStream = await localMediaStreamPromise;
+  for (const track of localMediaStream.getTracks()) {
+    peer.peerConn.addTrack(track, localMediaStream);
+  }
   setUpDataChannel(peer.peerConn.createDataChannel("myDataChannel"), peer);
   peer.peerConn.onicecandidate = (ev) => {
     if (ev.candidate !== null) {
@@ -112,6 +128,9 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
         candidate: ev.candidate
       });
     }
+  };
+  peer.peerConn.ontrack = (ev) => {
+    remoteVideoEl.srcObject = ev.streams[0];
   };
   const offer = signalingMsgOffer.offer;
   await peer.peerConn.setRemoteDescription(offer);
