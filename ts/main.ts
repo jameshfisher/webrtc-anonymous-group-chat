@@ -60,12 +60,20 @@ const msgBufferInputEl = document.getElementById("msgBuffer") as HTMLInputElemen
 const mySessionId =  Math.random().toString();  // FIXME uuid
 console.log("I am:", mySessionId);
 
+type Peer = {
+  id: SessionId,
+
+  peerConn: RTCPeerConnection,
+
+  // We may only get the data channel at some point later
+  dataChannel: RTCDataChannel | undefined
+}
+
 // TODO clean up conns on state disconnected/failed
-const peerConns: Map<SessionId, RTCPeerConnection> = new Map();
-const dataChannels: Map<SessionId, RTCDataChannel> = new Map();
+const peers: Map<SessionId, Peer> = new Map();
 
 // @ts-ignore
-window.dataChannels = dataChannels;
+window.peers = peers;
 
 function show(msg: string) {
   const newMsgEl = document.createElement('div');
@@ -78,7 +86,11 @@ msgBufferInputEl.onkeydown = ev => {
     const msg = msgBufferInputEl.value;
     msgBufferInputEl.value = '';
     show(msg);
-    for (const [sessionId, dataChannel] of dataChannels.entries()) {
+    for (const [sessionId, { dataChannel }] of peers.entries()) {
+      if (dataChannel === undefined) {
+        console.warn(`Could not send to ${sessionId}; no data channel`);
+        continue;
+      }
       try {
         dataChannel.send(msg);
       } catch (err) {
@@ -115,52 +127,52 @@ function newPeerConnection(): RTCPeerConnection {
   return new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
 }
 
-function getOrCreatePeerConnection(sessionId: SessionId): RTCPeerConnection {
-  let peerConn = peerConns.get(sessionId);
-  if (peerConn === undefined) {
-    peerConn = newPeerConnection();
-    peerConns.set(sessionId, peerConn);
+function newPeer(sessionId: SessionId): Peer {
+  if (peers.has(sessionId)) {
+    throw new Error("Received hello/offer from existing peer!");
   }
-  return peerConn;
+
+  const peerConn = newPeerConnection();
+  peerConn.onconnectionstatechange = ev => {
+    console.log("State of connection to ", sessionId, ":", peerConn.connectionState);
+  };
+  const peer = { id: sessionId, peerConn: peerConn, dataChannel: undefined };
+  peers.set(sessionId, peer);
+  return peer;
 }
 
-function setUpDataChannel(dataChannel: RTCDataChannel, remoteSessionId: SessionId) {
-  dataChannels.set(remoteSessionId, dataChannel);
-  dataChannel.onmessage = msgEv => show(`${remoteSessionId} says: ${msgEv.data}`);
+function setUpDataChannel(dataChannel: RTCDataChannel, peer: Peer) {
+  peer.dataChannel = dataChannel;
+  dataChannel.onmessage = msgEv => show(`${peer.id} says: ${msgEv.data}`);
 }
 
 async function handleSignalingMsgHello(signalingMsgHello: SignalingMsgHello) {
   if (signalingMsgHello.fromSessionId === mySessionId) return;
 
-  const newSessionId = signalingMsgHello.fromSessionId;
-  console.log("Received hello from", newSessionId);
+  const remoteSessionId = signalingMsgHello.fromSessionId;
+  console.log("Received hello from", remoteSessionId);
 
-  const peerConn = newPeerConnection();
-  peerConns.set(newSessionId, peerConn);
+  const peer = newPeer(remoteSessionId);
 
-  peerConn.onconnectionstatechange = ev => {
-    console.log("Connection state to ", newSessionId, ":", peerConn.connectionState);
-  };
+  setUpDataChannel(peer.peerConn.createDataChannel('myDataChannel'), peer);
 
-  setUpDataChannel(peerConn.createDataChannel('myDataChannel'), newSessionId);
-
-  peerConn.onicecandidate = ev => {
+  peer.peerConn.onicecandidate = ev => {
     if (ev.candidate !== null) {
       publishSignalingMsg({
         kind: "ice-candidate",
         fromSessionId: mySessionId, 
-        toSessionId: newSessionId, 
+        toSessionId: remoteSessionId, 
         candidate: ev.candidate
       });
     }
   };
 
-  const desc = await peerConn.createOffer();
-  await peerConn.setLocalDescription(desc);
+  const desc = await peer.peerConn.createOffer();
+  await peer.peerConn.setLocalDescription(desc);
   publishSignalingMsg({
     kind: "offer", 
     fromSessionId: mySessionId, 
-    toSessionId: newSessionId, 
+    toSessionId: remoteSessionId, 
     offer: desc
   });
 }
@@ -172,18 +184,14 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
   const fromSessionId = signalingMsgOffer.fromSessionId;
   console.log("Received offer from", fromSessionId);
 
-  const peerConn = getOrCreatePeerConnection(fromSessionId);
+  const peer = newPeer(fromSessionId);
 
-  peerConn.onconnectionstatechange = ev => {
-    console.log("Connection state to ", fromSessionId, ":", peerConn.connectionState);
-  };
-
-  peerConn.ondatachannel = dataChannelEv => {
+  peer.peerConn.ondatachannel = dataChannelEv => {
     const dataChannel = dataChannelEv.channel;
-    setUpDataChannel(dataChannel, fromSessionId);
+    setUpDataChannel(dataChannel, peer);
   };
 
-  peerConn.onicecandidate = ev => {
+  peer.peerConn.onicecandidate = ev => {
     if (ev.candidate !== null) {
       publishSignalingMsg({
         kind: "ice-candidate",
@@ -196,9 +204,9 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
 
   const offer = signalingMsgOffer.offer;
 
-  await peerConn.setRemoteDescription(offer);
-  const answerDesc = await peerConn.createAnswer();
-  await peerConn.setLocalDescription(answerDesc);
+  await peer.peerConn.setRemoteDescription(offer);
+  const answerDesc = await peer.peerConn.createAnswer();
+  await peer.peerConn.setLocalDescription(answerDesc);
 
   publishSignalingMsg({
     kind: "answer", 
@@ -215,15 +223,15 @@ async function handleSignalingMsgAnswer(signalingMsgAnswer: SignalingMsgAnswer) 
   const fromSessionId = signalingMsgAnswer.fromSessionId;
   console.log("Received answer from", fromSessionId);
 
-  const peerConn = peerConns.get(fromSessionId);
+  const peer = peers.get(fromSessionId);
   
-  if (peerConn === undefined) {
+  if (peer === undefined) {
     throw new Error("Unexpected answer from a peer we never sent an offer to!");
   }
   
   console.log("Setting answer");
   const answer = signalingMsgAnswer.answer;
-  await peerConn.setRemoteDescription(answer);
+  await peer.peerConn.setRemoteDescription(answer);
 }
 
 async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate: SignalingMsgIceCandidate) {
@@ -233,14 +241,14 @@ async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate: Signalin
   const fromSessionId = signalingMsgIceCandidate.fromSessionId;
   console.log("Received ICE candidate from", fromSessionId);
 
-  const peerConn = peerConns.get(fromSessionId);
+  const peer = peers.get(fromSessionId);
   
-  if (peerConn === undefined) {
+  if (peer === undefined) {
     // FIXME this could actually be possible?
     throw new Error("Unexpected ICE candidate from a peer we don't know about yet");
   }
 
-  await peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
+  await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
 }
 
 ablyChatRoomSignalingChannel.subscribe(ablyMessage => {
