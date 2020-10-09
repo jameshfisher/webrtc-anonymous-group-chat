@@ -45,7 +45,7 @@ function assertUnreachable(x: never): never {
 }
 
 const localVideoEl = document.getElementById("localVideo") as HTMLVideoElement;
-const remoteVideoEl = document.getElementById("remoteVideo") as HTMLVideoElement;
+const remoteVideoContainerEl = document.getElementById("remoteVideos") as HTMLElement;
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer") as HTMLInputElement;
 
@@ -233,7 +233,12 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
   };
 
   peer.peerConn.ontrack = ev => {
+    const remoteVideoEl = document.createElement("video");
+    remoteVideoEl.autoplay = true;
+    remoteVideoEl.muted = true;
+    remoteVideoContainerEl.appendChild(remoteVideoEl);
     remoteVideoEl.srcObject = ev.streams[0];
+    // FIXME we need to remove it when the connection dies
   };
 
   const offer = signalingMsgOffer.offer;

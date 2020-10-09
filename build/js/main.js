@@ -3,7 +3,7 @@ function assertUnreachable(x) {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
 }
 const localVideoEl = document.getElementById("localVideo");
-const remoteVideoEl = document.getElementById("remoteVideo");
+const remoteVideoContainerEl = document.getElementById("remoteVideos");
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer");
 const localMediaStreamPromise = navigator.mediaDevices.getUserMedia({
@@ -130,6 +130,10 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
     }
   };
   peer.peerConn.ontrack = (ev) => {
+    const remoteVideoEl = document.createElement("video");
+    remoteVideoEl.autoplay = true;
+    remoteVideoEl.muted = true;
+    remoteVideoContainerEl.appendChild(remoteVideoEl);
     remoteVideoEl.srcObject = ev.streams[0];
   };
   const offer = signalingMsgOffer.offer;
