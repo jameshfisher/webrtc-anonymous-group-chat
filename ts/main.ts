@@ -75,6 +75,9 @@ type Peer = {
 
   peerConn: RTCPeerConnection,
 
+  // This awful thing is due to https://stackoverflow.com/questions/38198751/domexception-error-processing-ice-candidate
+  iceCandidateBuffer: Array<RTCIceCandidate>,
+
   // We may only get the data channel at some point later
   dataChannel: RTCDataChannel | undefined
 }
@@ -162,7 +165,7 @@ function newPeer(sessionId: SessionId): Peer {
     }
   };
 
-  const peer = { id: sessionId, peerConn: peerConn, dataChannel: undefined };
+  const peer = { id: sessionId, peerConn: peerConn, iceCandidateBuffer: [], dataChannel: undefined };
   peers.set(sessionId, peer);
   return peer;
 }
@@ -207,6 +210,17 @@ function getOrCreatePeer(remoteSessionId: SessionId): Peer {
   return peers.get(remoteSessionId) || newPeer(remoteSessionId);
 }
 
+async function setRemoteDescription(peer: Peer, description: RTCSessionDescriptionInit) {
+  await peer.peerConn.setRemoteDescription(description);
+  if (!peer.peerConn.remoteDescription) {
+    throw new Error("remoteDescription not set after setting");
+  }
+  for (const candidate of peer.iceCandidateBuffer) {
+    await peer.peerConn.addIceCandidate(candidate);
+  }
+  peer.iceCandidateBuffer = [];
+}
+
 async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
   if (signalingMsgOffer.fromSessionId === mySessionId) return;
 
@@ -229,9 +243,8 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
     // FIXME we need to remove it when the connection dies
   };
 
-  const offer = signalingMsgOffer.offer;
+  await setRemoteDescription(peer, signalingMsgOffer.offer);
 
-  await peer.peerConn.setRemoteDescription(offer);
   const answerDesc = await peer.peerConn.createAnswer();
   await peer.peerConn.setLocalDescription(answerDesc);
 
@@ -258,8 +271,7 @@ async function handleSignalingMsgAnswer(signalingMsgAnswer: SignalingMsgAnswer) 
   }
   
   console.log("Setting answer");
-  const answer = signalingMsgAnswer.answer;
-  await peer.peerConn.setRemoteDescription(answer);
+  await setRemoteDescription(peer, signalingMsgAnswer.answer);
 }
 
 async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate: SignalingMsgIceCandidate) {
@@ -269,8 +281,12 @@ async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate: Signalin
   console.log("Received ICE candidate from", fromSessionId);
 
   const peer = getOrCreatePeer(fromSessionId);
-  
-  await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
+
+  if (peer.peerConn.remoteDescription) {
+    await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
+  } else {
+    peer.iceCandidateBuffer.push(signalingMsgIceCandidate.candidate);
+  }
 }
 
 ablyClient.connect();

@@ -78,7 +78,7 @@ function newPeer(sessionId) {
       });
     }
   };
-  const peer = {id: sessionId, peerConn, dataChannel: void 0};
+  const peer = {id: sessionId, peerConn, iceCandidateBuffer: [], dataChannel: void 0};
   peers.set(sessionId, peer);
   return peer;
 }
@@ -110,6 +110,16 @@ async function handleHello(remoteSessionId) {
 function getOrCreatePeer(remoteSessionId) {
   return peers.get(remoteSessionId) || newPeer(remoteSessionId);
 }
+async function setRemoteDescription(peer, description) {
+  await peer.peerConn.setRemoteDescription(description);
+  if (!peer.peerConn.remoteDescription) {
+    throw new Error("remoteDescription not set after setting");
+  }
+  for (const candidate of peer.iceCandidateBuffer) {
+    await peer.peerConn.addIceCandidate(candidate);
+  }
+  peer.iceCandidateBuffer = [];
+}
 async function handleSignalingMsgOffer(signalingMsgOffer) {
   if (signalingMsgOffer.fromSessionId === mySessionId)
     return;
@@ -127,8 +137,7 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
     remoteVideoContainerEl.appendChild(remoteVideoEl);
     remoteVideoEl.srcObject = ev.streams[0];
   };
-  const offer = signalingMsgOffer.offer;
-  await peer.peerConn.setRemoteDescription(offer);
+  await setRemoteDescription(peer, signalingMsgOffer.offer);
   const answerDesc = await peer.peerConn.createAnswer();
   await peer.peerConn.setLocalDescription(answerDesc);
   publishSignalingMsg(signalingMsgOffer.fromSessionId, {
@@ -147,8 +156,7 @@ async function handleSignalingMsgAnswer(signalingMsgAnswer) {
     throw new Error("Unexpected answer from a peer we never sent an offer to!");
   }
   console.log("Setting answer");
-  const answer = signalingMsgAnswer.answer;
-  await peer.peerConn.setRemoteDescription(answer);
+  await setRemoteDescription(peer, signalingMsgAnswer.answer);
 }
 async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate) {
   if (signalingMsgIceCandidate.fromSessionId === mySessionId)
@@ -156,7 +164,11 @@ async function handleSignalingMsgIceCandidate(signalingMsgIceCandidate) {
   const fromSessionId = signalingMsgIceCandidate.fromSessionId;
   console.log("Received ICE candidate from", fromSessionId);
   const peer = getOrCreatePeer(fromSessionId);
-  await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
+  if (peer.peerConn.remoteDescription) {
+    await peer.peerConn.addIceCandidate(signalingMsgIceCandidate.candidate);
+  } else {
+    peer.iceCandidateBuffer.push(signalingMsgIceCandidate.candidate);
+  }
 }
 ablyClient.connect();
 ablyClient.connection.on("connected", async () => {
