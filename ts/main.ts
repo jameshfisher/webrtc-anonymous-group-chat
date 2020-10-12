@@ -44,22 +44,8 @@ function assertUnreachable(x: never): never {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
 }
 
-const localVideoEl = document.getElementById("localVideo") as HTMLVideoElement;
-const remoteVideoEl = document.getElementById("remoteVideo") as HTMLVideoElement;
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer") as HTMLInputElement;
-
-const localMediaStreamPromise = navigator.mediaDevices.getUserMedia({
-  video: {
-    width: { ideal: 360 }
-  },
-  audio: false
-});
-
-(async () => {
-  const mediaStream = await localMediaStreamPromise;
-  localVideoEl.srcObject = mediaStream;
-})();
 
 // A session is one run of the webpage. A refresh gets a new session ID.
 // This simplifies things:
@@ -186,12 +172,6 @@ async function handleHello(remoteSessionId: SessionId) {
 
   const peer = newPeer(remoteSessionId);
 
-  const localMediaStream = await localMediaStreamPromise;
-
-  for (const track of localMediaStream.getTracks()) {
-    peer.peerConn.addTrack(track, localMediaStream);
-  }
-
   setUpDataChannel(peer.peerConn.createDataChannel('myDataChannel'), peer);
 
   const desc = await peer.peerConn.createOffer();
@@ -232,10 +212,6 @@ async function handleSignalingMsgOffer(signalingMsgOffer: SignalingMsgOffer) {
   peer.peerConn.ondatachannel = dataChannelEv => {
     const dataChannel = dataChannelEv.channel;
     setUpDataChannel(dataChannel, peer);
-  };
-
-  peer.peerConn.ontrack = ev => {
-    remoteVideoEl.srcObject = ev.streams[0];
   };
 
   await setRemoteDescription(peer, signalingMsgOffer.offer);

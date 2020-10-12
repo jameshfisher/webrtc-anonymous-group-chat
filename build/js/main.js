@@ -2,20 +2,8 @@ import {Realtime} from "../web_modules/ably/promises.js";
 function assertUnreachable(x) {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
 }
-const localVideoEl = document.getElementById("localVideo");
-const remoteVideoEl = document.getElementById("remoteVideo");
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer");
-const localMediaStreamPromise = navigator.mediaDevices.getUserMedia({
-  video: {
-    width: {ideal: 360}
-  },
-  audio: false
-});
-(async () => {
-  const mediaStream = await localMediaStreamPromise;
-  localVideoEl.srcObject = mediaStream;
-})();
 const mySessionId = Math.random().toString();
 console.log("I am:", mySessionId);
 const peers = new Map();
@@ -94,10 +82,6 @@ async function handleHello(remoteSessionId) {
   }
   console.log("Received hello from", remoteSessionId);
   const peer = newPeer(remoteSessionId);
-  const localMediaStream = await localMediaStreamPromise;
-  for (const track of localMediaStream.getTracks()) {
-    peer.peerConn.addTrack(track, localMediaStream);
-  }
   setUpDataChannel(peer.peerConn.createDataChannel("myDataChannel"), peer);
   const desc = await peer.peerConn.createOffer();
   await peer.peerConn.setLocalDescription(desc);
@@ -129,9 +113,6 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
   peer.peerConn.ondatachannel = (dataChannelEv) => {
     const dataChannel = dataChannelEv.channel;
     setUpDataChannel(dataChannel, peer);
-  };
-  peer.peerConn.ontrack = (ev) => {
-    remoteVideoEl.srcObject = ev.streams[0];
   };
   await setRemoteDescription(peer, signalingMsgOffer.offer);
   const answerDesc = await peer.peerConn.createAnswer();
