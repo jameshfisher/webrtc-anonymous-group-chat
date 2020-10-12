@@ -44,6 +44,7 @@ function assertUnreachable(x: never): never {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
 }
 
+const peersEl = document.getElementById("peers") as HTMLElement;
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer") as HTMLInputElement;
 
@@ -116,6 +117,10 @@ function publishSignalingMsg(toSessionId: SessionId, signalingMsg: SignalingMsg)
   remoteSessionAblyChannel.publish('signaling-msg', signalingMsg);
 }
 
+function showPeers() {
+  peersEl.innerText = [...peers.keys()].join(", ");
+}
+
 function newPeerConnection(): RTCPeerConnection {
   return new RTCPeerConnection({'iceServers': [{'urls': ['stun:stun.l.google.com:19302']}]});
 }
@@ -135,6 +140,7 @@ function newPeer(sessionId: SessionId): Peer {
     ) {
       console.log(`Cleaning up ${sessionId}`);
       peers.delete(sessionId);
+      showPeers();
     }
   };
 
@@ -153,6 +159,9 @@ function newPeer(sessionId: SessionId): Peer {
 
   const peer = { id: sessionId, peerConn: peerConn, iceCandidateBuffer: [], dataChannel: undefined };
   peers.set(sessionId, peer);
+
+  showPeers();
+
   return peer;
 }
 

@@ -2,6 +2,7 @@ import {Realtime} from "../web_modules/ably/promises.js";
 function assertUnreachable(x) {
   throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
 }
+const peersEl = document.getElementById("peers");
 const msgsEl = document.getElementById("msgs");
 const msgBufferInputEl = document.getElementById("msgBuffer");
 const mySessionId = Math.random().toString();
@@ -42,6 +43,9 @@ function publishSignalingMsg(toSessionId, signalingMsg) {
   const remoteSessionAblyChannel = ablyClient.channels.get(toSessionId);
   remoteSessionAblyChannel.publish("signaling-msg", signalingMsg);
 }
+function showPeers() {
+  peersEl.innerText = [...peers.keys()].join(", ");
+}
 function newPeerConnection() {
   return new RTCPeerConnection({iceServers: [{urls: ["stun:stun.l.google.com:19302"]}]});
 }
@@ -55,6 +59,7 @@ function newPeer(sessionId) {
     if (peerConn.connectionState === "closed" || peerConn.connectionState === "disconnected" || peerConn.connectionState === "failed") {
       console.log(`Cleaning up ${sessionId}`);
       peers.delete(sessionId);
+      showPeers();
     }
   };
   peerConn.onicecandidate = (ev) => {
@@ -68,6 +73,7 @@ function newPeer(sessionId) {
   };
   const peer = {id: sessionId, peerConn, iceCandidateBuffer: [], dataChannel: void 0};
   peers.set(sessionId, peer);
+  showPeers();
   return peer;
 }
 function setUpDataChannel(dataChannel, peer) {
