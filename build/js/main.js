@@ -110,9 +110,11 @@ async function handleSignalingMsgOffer(signalingMsgOffer) {
   const fromSessionId = signalingMsgOffer.fromSessionId;
   console.log("Received offer from", fromSessionId);
   const peer = getOrCreatePeer(fromSessionId);
+  if (peer.peerConn.remoteDescription) {
+    console.warn("Received a second offer from the same peer", peer);
+  }
   peer.peerConn.ondatachannel = (dataChannelEv) => {
-    const dataChannel = dataChannelEv.channel;
-    setUpDataChannel(dataChannel, peer);
+    setUpDataChannel(dataChannelEv.channel, peer);
   };
   await setRemoteDescription(peer, signalingMsgOffer.offer);
   const answerDesc = await peer.peerConn.createAnswer();
@@ -131,6 +133,9 @@ async function handleSignalingMsgAnswer(signalingMsgAnswer) {
   const peer = peers.get(fromSessionId);
   if (peer === void 0) {
     throw new Error("Unexpected answer from a peer we never sent an offer to!");
+  }
+  if (peer.peerConn.remoteDescription) {
+    console.warn("Received a second offer from the same peer", peer);
   }
   console.log("Setting answer");
   await setRemoteDescription(peer, signalingMsgAnswer.answer);
